@@ -1,0 +1,6 @@
+{
+  "name": "Slay",
+  "description": "AI-powered personalized clothing matcher and virtual try-on platform with smart style matching.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
