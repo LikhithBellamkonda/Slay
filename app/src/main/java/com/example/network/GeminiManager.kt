@@ -63,7 +63,7 @@ object GeminiManager {
         val prompt = """
             You are a highly precise fashion expert and automated garment vision system.
             Analyze this clothing item described as: "$tagSuggestion". 
-            Determine its category (must be either: "shirt", "t-shirt", "pants", "jeans", "hoodie", "jacket", "shoes", or "accessories"), 
+            Determine its category (must be either: "shirt", "t-shirt", "pants", "jeans", "hoodie", "jacket", "shoes", "accessories", or "shorts"), 
             its dominant descriptive color (e.g. "Slate Grey"), an appropriate matching HEX color string for rendering (e.g. "#4E5D6C"),
             its fashion style (must be either: "Formal", "Casual", "Streetwear", "Sporty", "Elegant"),
             its ideal season suitability ("Summer", "Autumn", "Winter", "Spring", or "All"),
@@ -172,7 +172,8 @@ object GeminiManager {
     suspend fun chatWithStylist(
         userQuery: String,
         wardrobe: List<ClothingEntity>,
-        chatHistory: List<Pair<String, Boolean>> // List of Pair(Message, isUser)
+        chatHistory: List<Pair<String, Boolean>>, // List of Pair(Message, isUser)
+        history: List<com.example.data.OutfitHistoryEntity> = emptyList()
     ): String = withContext(Dispatchers.IO) {
         val apiKey = getApiKey()
         if (!isKeyConfigured(apiKey)) {
@@ -184,6 +185,15 @@ object GeminiManager {
             "- [ID #${item.id}] Category: ${item.category}, Name: ${item.name}, Color_Hex: ${item.colorHex}, Description: ${item.color} ${item.style} fits. Suited seasons: ${item.season}. Matches occasions: ${item.occasions}."
         }
 
+        val historySummary = if (history.isEmpty()) {
+            "No past logged wear events yet. Invite them to Slay by logging an outfit!"
+        } else {
+            val totalWorn = history.size
+            val occasionCounts = history.groupBy { it.occasion }.mapValues { it.value.size }
+            val mainOccasion = occasionCounts.maxByOrNull { it.value }?.key ?: "N/A"
+            "Total logged wears: $totalWorn times. Main occasion context: $mainOccasion. Split counts: ${occasionCounts.entries.joinToString { "${it.key}: ${it.value}" }}."
+        }
+
         val systemPrompt = """
             You are "Slay" - a world-class elite AI Personal Fashion Stylist assisting the user.
             You have live, direct visibility into the user's digital wardrobe:
@@ -191,12 +201,16 @@ object GeminiManager {
             USER WARDROBE ITEMS:
             $wardrobeSummary
             
+            USER HISTORIC WEAR LOGS STATISTICS:
+            $historySummary
+            
             Rules for Stylist:
             1. Suggest real styling coordinates *strictly* matching the IDs and names of items existing in the user's wardrobe summary in order to make recommendations actionable.
             2. Be inspiring, highly conversational, visually descriptive (explain why colors and style silhouettes coordinate well).
             3. Address occasion contexts (office, wedding, streetwear, winter warmth) with precision.
-            4. Keep responses elegant, structured with concise bullet points, and brief (under 120 words).
+            4. Keep responses elegant, structured with concise bullet points, and brief (under 120 words). Provide a neat, specific answer type for whatever the user inquires.
             5. Reference specific item IDs: for example: "Suggest checking out your [White Oxford Buttondown #2]" or similar, so they can easily click or tap.
+            6. Actively incorporate or reference stats from the user's historic wear logs where helpful (e.g. mention most frequent occasion or total slayed clothes counts).
         """.trimIndent()
 
         try {
@@ -342,6 +356,7 @@ object GeminiManager {
         
         // Category detection
         val category = when {
+            query.contains("shorts") -> "shorts"
             query.contains("tee") || query.contains("tshirt") || query.contains("t-shirt") -> "t-shirt"
             query.contains("shirt") || query.contains("buttondown") || query.contains("polo") -> "shirt"
             query.contains("jeans") || query.contains("denim") -> "jeans"
@@ -462,6 +477,173 @@ object GeminiManager {
                     "Welcome! I am your AI stylist. Add items to your wardobe or upload garment photos, and I will instantly analyze compatibility, draft color palettes, and curate high-aesthetic capsule outfits representing your absolute best."
                 }
             }
+        }
+    }
+
+    suspend fun analyzeGarmentDual(
+        tagSuggestion: String,
+        bitmap1: Bitmap? = null,
+        bitmap2: Bitmap? = null
+    ): List<GarmentAnalysis> = withContext(Dispatchers.IO) {
+        val apiKey = getApiKey()
+        if (!isKeyConfigured(apiKey)) {
+            Log.w(TAG, "Gemini API Key is not configured for dual analysis. Falling back to local offline fast classification.")
+            val topAnalysis = parseDraftOffline(if (tagSuggestion.isNotBlank()) tagSuggestion + " top" else "Classic Office Formal Shirt")
+            val bottomAnalysis = parseDraftOffline(if (tagSuggestion.isNotBlank()) tagSuggestion + " bottom" else "Tailored Office Formal Trousers")
+            return@withContext listOf(
+                topAnalysis.copy(category = "shirt", style = "Formal"),
+                bottomAnalysis.copy(category = "pants", style = "Formal")
+            )
+        }
+
+        val prompt = """
+            You are a highly precise fashion expert and automated garment vision system.
+            Analyze these two garments uploaded collectively. User tags: "$tagSuggestion".
+            These form a professional office / formal set (e.g., formal shirt, blazer for top, and formal pants or skirt for bottom).
+            
+            Analyze BOTH clothing items individually.
+            For each item, determine:
+            1. Its category (must be either: "shirt", "t-shirt", "pants", "jeans", "hoodie", "jacket", "shoes", "accessories", or "shorts"),
+            2. Its commercial product styling name,
+            3. Its dominant descriptive color (e.g. "Ice Blue") and an appropriate HEX color string (e.g. "#D0E0F0"),
+            4. Its fashion style (strictly "Formal"),
+            5. Its ideal season suitability ("Summer", "Autumn", "Winter", "Spring", or "All"),
+            6. Its pattern (e.g. solid, checked, striped, pinstriped) and print characteristics. Incorporate these pattern/print details directly and clearly into the product label name (e.g. "Striped Silk Office Shirt" or "Solid Charcoal Wool Slacks"),
+            7. Its suitable occasions (strictly include "Office").
+
+            Return strictly a JSON object with this exact format containing a list of exactly 2 items (no markdown, no quotes outside JSON):
+            {
+              "items": [
+                {
+                  "category": "shirt",
+                  "name": "Pinstripe Cotton Formal Shirt",
+                  "color": "Ice Blue",
+                  "colorHex": "#D0E0F0",
+                  "style": "Formal",
+                  "season": "All",
+                  "occasions": "Office,Party"
+                },
+                {
+                  "category": "pants",
+                  "name": "Solid Fitted Charcoal Trousers",
+                  "color": "Charcoal Grey",
+                  "colorHex": "#36454F",
+                  "style": "Formal",
+                  "season": "All",
+                  "occasions": "Office,Wedding"
+                }
+              ]
+            }
+        """.trimIndent()
+
+        try {
+            val endpoint = "https://generativelanguage.googleapis.com/v1beta/models/$MODEL_NAME:generateContent?key=$apiKey"
+            val partsArray = JSONArray()
+            partsArray.put(JSONObject().put("text", prompt))
+            
+            if (bitmap1 != null) {
+                val inlineData = JSONObject().apply {
+                    put("mimeType", "image/jpeg")
+                    put("data", bitmap1.toBase64())
+                }
+                partsArray.put(JSONObject().put("inlineData", inlineData))
+            }
+            if (bitmap2 != null) {
+                val inlineData = JSONObject().apply {
+                    put("mimeType", "image/jpeg")
+                    put("data", bitmap2.toBase64())
+                }
+                partsArray.put(JSONObject().put("inlineData", inlineData))
+            }
+
+            val contents = JSONArray().put(JSONObject().put("parts", partsArray))
+            
+            val itemProperties = JSONObject().apply {
+                put("category", JSONObject().put("type", "STRING"))
+                put("name", JSONObject().put("type", "STRING"))
+                put("color", JSONObject().put("type", "STRING"))
+                put("colorHex", JSONObject().put("type", "STRING"))
+                put("style", JSONObject().put("type", "STRING"))
+                put("season", JSONObject().put("type", "STRING"))
+                put("occasions", JSONObject().put("type", "STRING"))
+            }
+
+            val itemSchema = JSONObject().apply {
+                put("type", "OBJECT")
+                put("properties", itemProperties)
+                put("required", JSONArray().apply {
+                    put("category"); put("name"); put("color"); put("colorHex"); put("style"); put("season"); put("occasions")
+                })
+            }
+
+            val responseFormat = JSONObject().apply {
+                put("type", "OBJECT")
+                put("properties", JSONObject().apply {
+                    put("items", JSONObject().apply {
+                        put("type", "ARRAY")
+                        put("items", itemSchema)
+                    })
+                })
+                put("required", JSONArray().apply { put("items") })
+            }
+
+            val generationConfig = JSONObject().apply {
+                put("responseMimeType", "application/json")
+                put("responseSchema", responseFormat)
+                put("temperature", 0.1)
+            }
+
+            val requestBodyJson = JSONObject().apply {
+                put("contents", contents)
+                put("generationConfig", generationConfig)
+            }
+
+            val mediaType = "application/json; charset=utf-8".toMediaType()
+            val request = Request.Builder()
+                .url(endpoint)
+                .post(requestBodyJson.toString().toRequestBody(mediaType))
+                .build()
+
+            client.newCall(request).execute().use { response ->
+                if (!response.isSuccessful) {
+                    throw Exception("API Error code ${response.code}")
+                }
+                val responseString = response.body?.string() ?: ""
+                val responseJson = JSONObject(responseString)
+                val candidates = responseJson.getJSONArray("candidates")
+                val textOutput = candidates.getJSONObject(0)
+                    .getJSONObject("content")
+                    .getJSONArray("parts")
+                    .getJSONObject(0)
+                    .getString("text")
+
+                val mainObj = JSONObject(textOutput.trim())
+                val itemsArr = mainObj.getJSONArray("items")
+                val resultList = mutableListOf<GarmentAnalysis>()
+                for (i in 0 until itemsArr.length()) {
+                    val res = itemsArr.getJSONObject(i)
+                    resultList.add(
+                        GarmentAnalysis(
+                            category = res.optString("category", "shirt"),
+                            name = res.optString("name", "Custom Office Item"),
+                            color = res.optString("color", "Grey"),
+                            colorHex = res.optString("colorHex", "#888888"),
+                            style = res.optString("style", "Formal"),
+                            season = res.optString("season", "All"),
+                            occasions = res.optString("occasions", "Office")
+                        )
+                    )
+                }
+                return@withContext resultList
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed dual image analysis, falling back to offline", e)
+            val topAnalysis = parseDraftOffline(if (tagSuggestion.isNotBlank()) tagSuggestion + " top" else "Classic Office Formal Shirt")
+            val bottomAnalysis = parseDraftOffline(if (tagSuggestion.isNotBlank()) tagSuggestion + " bottom" else "Tailored Office Formal Trousers")
+            return@withContext listOf(
+                topAnalysis.copy(category = "shirt", style = "Formal"),
+                bottomAnalysis.copy(category = "pants", style = "Formal")
+            )
         }
     }
 }

@@ -97,14 +97,22 @@ class FitCheckViewModel(application: Application) : AndroidViewModel(application
     private val _selectedSeason = MutableStateFlow("All")
     val selectedSeason: StateFlow<String> = _selectedSeason.asStateFlow()
 
+    // --- Dismissed Outfit Recommendations ---
+    private val _dismissedComboKeys = MutableStateFlow<Set<String>>(emptySet())
+    val dismissedComboKeys: StateFlow<Set<String>> = _dismissedComboKeys.asStateFlow()
+
     // --- Curated Outfit Recommendations ---
     val recommendations: StateFlow<List<OutfitCombination>> = combine(
         allClothes,
         _selectedOccasion,
         _selectedSeason,
-        repository.outfitHistory
-    ) { clothes, occasion, season, history ->
-        repository.generateRecommendations(clothes, occasion, season, history)
+        repository.outfitHistory,
+        dismissedComboKeys
+    ) { clothes, occasion, season, history, dismissedKeys ->
+        repository.generateRecommendations(clothes, occasion, season, history).filter { combo ->
+            val key = "${combo.top.id}_${combo.bottom.id}_${combo.shoes.id}"
+            !dismissedKeys.contains(key)
+        }
     }.flowOn(kotlinx.coroutines.Dispatchers.Default)
     .stateIn(
         scope = viewModelScope,
@@ -203,10 +211,21 @@ class FitCheckViewModel(application: Application) : AndroidViewModel(application
                 userSelfieUrl = if (selfieUrl.isNullOrBlank()) null else selfieUrl,
                 activeModel = ModelPreset("model_user", "Myself", "Personalized Canvas (Me)", "Custom", skinColor)
             )
+            val savedDismissed = prefs.getStringSet("dismissed_combos_set", emptySet()) ?: emptySet()
+            _dismissedComboKeys.value = savedDismissed
         }
         
-        // Trigger weather check on app initialization
-        checkWeatherAndSendNotification()
+        // Trigger daily start-of-day reminder irrespective of weather
+        triggerStartOfDayNotification()
+
+        // Schedule periodic weather checker updates repeating every 4 hours
+        viewModelScope.launch {
+            while (true) {
+                checkWeatherAndSendNotification()
+                // Wait 4 hours
+                kotlinx.coroutines.delay(4 * 60 * 60 * 1000L)
+            }
+        }
     }
 
     fun savePersistentState() {
@@ -232,10 +251,17 @@ class FitCheckViewModel(application: Application) : AndroidViewModel(application
         }
     }
 
+    fun triggerStartOfDayNotification() {
+        Log.d("FitCheckViewModel", "Triggering daily start reminder...")
+        val message = "Good morning! Let's Slay a brand new day! Irrespective of weather, your smart wardrobe concierge is ready."
+        triggerSystemNotification(message)
+    }
+
     fun checkWeatherAndSendNotification() {
         viewModelScope.launch(Dispatchers.IO) {
             try {
-                val url = URL("https://api.open-meteo.com/v1/forecast?latitude=12.9716&longitude=77.5946&current=temperature_2m,weather_code")
+                // Request current and hourly forecast parameters
+                val url = URL("https://api.open-meteo.com/v1/forecast?latitude=12.9716&longitude=77.5946&current=temperature_2m,weather_code&hourly=temperature_2m,weather_code")
                 val conn = url.openConnection() as HttpURLConnection
                 conn.requestMethod = "GET"
                 conn.connectTimeout = 5000
@@ -248,13 +274,53 @@ class FitCheckViewModel(application: Application) : AndroidViewModel(application
                     val temp = current.getDouble("temperature_2m")
                     val weatherCode = current.getInt("weather_code")
                     
+                    // Parse hourly forecasts (+4 hrs, +8 hrs)
+                    val hourly = json.optJSONObject("hourly")
+                    val hourlyTimes = hourly?.optJSONArray("time")
+                    val hourlyTemps = hourly?.optJSONArray("temperature_2m")
+                    val hourlyCodes = hourly?.optJSONArray("weather_code")
+                    
+                    var laterForecastText = "No forecast data available for later."
+                    if (hourlyTimes != null && hourlyTemps != null && hourlyCodes != null) {
+                        val currentHour = java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY)
+                        val indexPlus4 = (currentHour + 4) % 24
+                        val indexPlus8 = (currentHour + 8) % 24
+                        
+                        val tempPlus4 = hourlyTemps.optDouble(indexPlus4, temp)
+                        val codePlus4 = hourlyCodes.optInt(indexPlus4, weatherCode)
+                        val descPlus4 = when (codePlus4) {
+                            0 -> "Clear Skies"
+                            1, 2, 3 -> "Partly Cloudy"
+                            45, 48 -> "Foggy Atmospheric Mist"
+                            51, 53, 55, 61, 63, 65, 80, 81, 82 -> "Rain Showers"
+                            71, 73, 75, 77, 85, 86 -> "Snow Fall"
+                            95, 96, 99 -> "Severe Storms"
+                            else -> "Overcast Sky"
+                        }
+                        
+                        val tempPlus8 = hourlyTemps.optDouble(indexPlus8, temp)
+                        val codePlus8 = hourlyCodes.optInt(indexPlus8, weatherCode)
+                        val descPlus8 = when (codePlus8) {
+                            0 -> "Clear Skies"
+                            1, 2, 3 -> "Partly Cloudy"
+                            45, 48 -> "Foggy Atmospheric Mist"
+                            51, 53, 55, 61, 63, 65, 80, 81, 82 -> "Rain Showers"
+                            71, 73, 75, 77, 85, 86 -> "Snow Fall"
+                            95, 96, 99 -> "Severe Storms"
+                            else -> "Overcast Sky"
+                        }
+                        
+                        laterForecastText = "⚠️ LATER FORECAST INTERNALS:\n• In 4 Hours: ${tempPlus4.toInt()}°C (${descPlus4})\n• In 8 Hours: ${tempPlus8.toInt()}°C (${descPlus8})"
+                    }
+                    
                     val (notificationMsg, stylistAdvice) = generateWeatherAdvice(temp, weatherCode)
+                    val enrichedStylistAdvice = stylistAdvice + "\n\n$laterForecastText"
                     
                     withContext(Dispatchers.Main) {
-                        _weatherAlert.value = stylistAdvice
+                        _weatherAlert.value = enrichedStylistAdvice
                         _weatherNotification.value = notificationMsg
                         
-                        triggerSystemNotification(notificationMsg)
+                        triggerSystemNotification("Weather: $notificationMsg. Slay forecasts: " + laterForecastText.replace("\n", " ").replace("⚠️", ""))
                     }
                 } else {
                     throw Exception("Failed with code: $code")
@@ -265,7 +331,7 @@ class FitCheckViewModel(application: Application) : AndroidViewModel(application
                 val (notificationMsg, stylistAdvice) = generateWeatherAdviceOffline(targetSeason)
                 
                 withContext(Dispatchers.Main) {
-                    _weatherAlert.value = stylistAdvice
+                    _weatherAlert.value = stylistAdvice + "\n\n⚠️ LATER FORECAST INTERNALS (Offline standard season trend):\nTemp will remain steady typical of $targetSeason."
                     _weatherNotification.value = notificationMsg
                     
                     triggerSystemNotification(notificationMsg)
@@ -390,8 +456,27 @@ class FitCheckViewModel(application: Application) : AndroidViewModel(application
         }
     }
 
+    private val _selectedScoutClothes = MutableStateFlow<Set<ClothingEntity>>(emptySet())
+    val selectedScoutClothes: StateFlow<Set<ClothingEntity>> = _selectedScoutClothes.asStateFlow()
+
+    fun toggleScoutSelection(item: ClothingEntity) {
+        val current = _selectedScoutClothes.value
+        _selectedScoutClothes.value = if (current.contains(item)) {
+            current - item
+        } else {
+            current + item
+        }
+    }
+
+    fun clearScoutSelection() {
+        _selectedScoutClothes.value = emptySet()
+    }
+
     fun queryInternetCombos() {
         val curState = _tryOnState.value
+        val selection = _selectedScoutClothes.value
+        val wardrobeToFeed = if (selection.isNotEmpty()) selection.toList() else allClothes.value
+        
         viewModelScope.launch {
             _isScoutingLoading.value = true
             _scoutingResult.value = null
@@ -402,7 +487,7 @@ class FitCheckViewModel(application: Application) : AndroidViewModel(application
                     shirtSize = curState.shirtSize,
                     pantSize = curState.pantSize,
                     shoeSize = curState.shoeSize,
-                    wardrobe = allClothes.value
+                    wardrobe = wardrobeToFeed
                 )
                 _scoutingResult.value = result
             } catch (e: Exception) {
@@ -480,6 +565,36 @@ class FitCheckViewModel(application: Application) : AndroidViewModel(application
                 repository.insert(newCloth)
             } catch (e: Exception) {
                 Log.e("FitCheckViewModel", "Failed to add garment with AI Analysis", e)
+            } finally {
+                _isGarmentAnalyzing.value = false
+            }
+        }
+    }
+
+    /**
+     * Upload / Add 2 clothing items (e.g. professional office tops/bottoms) with dual real-time AI scanning
+     */
+    fun addNewGarmentDual(tagInput: String, bitmap1: Bitmap? = null, bitmap2: Bitmap? = null) {
+        viewModelScope.launch {
+            _isGarmentAnalyzing.value = true
+            try {
+                val items = GeminiManager.analyzeGarmentDual(tagInput, bitmap1, bitmap2)
+                for (item in items) {
+                    val newCloth = ClothingEntity(
+                        userId = _userProfile.value?.email ?: "anonymous",
+                        category = item.category,
+                        name = item.name,
+                        color = item.color,
+                        colorHex = item.colorHex,
+                        style = item.style,
+                        season = item.season,
+                        occasions = item.occasions,
+                        embeddingVector = "0.5,0.5,0.5,0.5"
+                    )
+                    repository.insert(newCloth)
+                }
+            } catch (e: Exception) {
+                Log.e("FitCheckViewModel", "Failed dual office analysis", e)
             } finally {
                 _isGarmentAnalyzing.value = false
             }
@@ -568,7 +683,7 @@ class FitCheckViewModel(application: Application) : AndroidViewModel(application
             try {
                 // Compile standard simple chat pairs
                 val historyList = _chatMessages.value.dropLast(1).map { Pair(it.message, it.isUser) }
-                val reply = GeminiManager.chatWithStylist(query, allClothes.value, historyList)
+                val reply = GeminiManager.chatWithStylist(query, allClothes.value, historyList, outfitHistory.value)
                 _chatMessages.update { it + StylistMessage(reply, false) }
             } catch (e: Exception) {
                 _chatMessages.update { it + StylistMessage("Pardon me, I encountered a connection hiccup. Let's try styling that again!", false) }
@@ -580,7 +695,12 @@ class FitCheckViewModel(application: Application) : AndroidViewModel(application
 
     // --- Try On Simulator Controls ---
     fun selectModelForTryOn(model: ModelPreset) {
-        _tryOnState.value = _tryOnState.value.copy(activeModel = model)
+        val finalModel = if (model.id == "model_user") {
+            model.copy(baseColor = _tryOnState.value.userSkinColor)
+        } else {
+            model
+        }
+        _tryOnState.value = _tryOnState.value.copy(activeModel = finalModel)
     }
 
     fun selectToTryOn(item: ClothingEntity) {
@@ -588,7 +708,7 @@ class FitCheckViewModel(application: Application) : AndroidViewModel(application
         val newState = when (item.category) {
             "shirt", "t-shirt" -> cur.copy(topItem = item)
             "hoodie" -> cur.copy(topItem = item) // Hoodie replaces Top
-            "pants", "jeans" -> cur.copy(bottomItem = item)
+            "pants", "jeans", "shorts" -> cur.copy(bottomItem = item)
             "shoes" -> cur.copy(shoesItem = item)
             "jacket" -> cur.copy(jacketItem = item)
             "accessories" -> cur.copy(accessoryItem = item)
@@ -670,5 +790,15 @@ class FitCheckViewModel(application: Application) : AndroidViewModel(application
             kotlinx.coroutines.delay(1200)
             _tryOnState.value = _tryOnState.value.copy(cloudSyncStatus = "Connected", cloudSyncProgress = 0.0f)
         }
+    }
+
+    fun dismissCombo(combo: OutfitCombination, reasons: List<String>, customText: String?) {
+        val key = "${combo.top.id}_${combo.bottom.id}_${combo.shoes.id}"
+        val newSet = _dismissedComboKeys.value + key
+        _dismissedComboKeys.value = newSet
+        
+        val context = getApplication<Application>()
+        val prefs = context.getSharedPreferences("slay_user_prefs", Context.MODE_PRIVATE)
+        prefs.edit().putStringSet("dismissed_combos_set", newSet).apply()
     }
 }

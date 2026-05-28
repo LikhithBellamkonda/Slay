@@ -210,6 +210,45 @@ fun ClothingVectorIcon(
                 drawCircle(color = Color(0xFFD7C49E), radius = 1.5.dp.toPx(), center = Offset(w * 0.35f, h * 0.24f))
                 drawCircle(color = Color(0xFFD7C49E), radius = 1.5.dp.toPx(), center = Offset(w * 0.65f, h * 0.24f))
             }
+            "shorts" -> {
+                // Stylish tailored hot-weather shorts
+                val path = Path().apply {
+                    moveTo(w * 0.28f, h * 0.15f)
+                    lineTo(w * 0.72f, h * 0.15f)
+                    // Hip right
+                    lineTo(w * 0.76f, h * 0.32f)
+                    // Leg right outer edge
+                    lineTo(w * 0.71f, h * 0.52f)
+                    // Cuff right
+                    lineTo(w * 0.52f, h * 0.52f)
+                    // Crotch inner right
+                    lineTo(w * 0.5f, h * 0.40f)
+                    // Crotch inner left
+                    lineTo(w * 0.48f, h * 0.52f)
+                    // Cuff left
+                    lineTo(w * 0.29f, h * 0.52f)
+                    // Leg left outer edge
+                    lineTo(w * 0.24f, h * 0.32f)
+                    close()
+                }
+                drawPath(path, color = garmentColor)
+                drawPath(path, color = outlineColor, style = Stroke(width = 3.dp.toPx()))
+
+                // Waistband line
+                drawLine(
+                    color = outlineColor,
+                    start = Offset(w * 0.26f, h * 0.22f),
+                    end = Offset(w * 0.74f, h * 0.22f),
+                    strokeWidth = 2.dp.toPx()
+                )
+                // Fly line
+                drawLine(
+                    color = outlineColor,
+                    start = Offset(w * 0.5f, h * 0.15f),
+                    end = Offset(w * 0.5f, h * 0.30f),
+                    strokeWidth = 2.5.dp.toPx()
+                )
+            }
             "hoodie" -> {
                 // Heavy loose hoodie
                 val path = Path().apply {

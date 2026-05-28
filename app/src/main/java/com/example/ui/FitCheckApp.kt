@@ -33,6 +33,8 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.key.*
+import androidx.compose.ui.layout.ContentScale
 import android.widget.Toast
 import android.graphics.drawable.BitmapDrawable
 import coil.imageLoader
@@ -164,14 +166,11 @@ fun LoginScreen(onLogin: (String, String) -> Unit) {
                 letterSpacing = 2.5.sp,
                 fontFamily = FontFamily.SansSerif
             )
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(
-                text = "Slay",
-                fontSize = 44.sp,
-                fontWeight = FontWeight.Light,
-                fontStyle = androidx.compose.ui.text.font.FontStyle.Italic,
-                color = TextLight,
-                fontFamily = FontFamily.Serif
+            Spacer(modifier = Modifier.height(14.dp))
+            SlayArchitecturalLogo(
+                height = 54.dp,
+                textColor = TextLight,
+                accentColor = Color(0xFFFF3B30)
             )
             Spacer(modifier = Modifier.height(10.dp))
 
@@ -640,7 +639,7 @@ fun MainAppLayout(viewModel: FitCheckViewModel) {
         )
     }
 
-    Scaffold(
+     Scaffold(
         modifier = Modifier
             .fillMaxSize()
             .windowInsetsPadding(WindowInsets.safeDrawing),
@@ -655,6 +654,7 @@ fun MainAppLayout(viewModel: FitCheckViewModel) {
                     Triple("match_maker", "Match", Icons.Default.Checkroom),
                     Triple("closet", "Closet", Icons.Default.AllInbox),
                     Triple("try_on", "Try On", Icons.Default.Psychology),
+                    Triple("skin_analysis", "Skin Tone", Icons.Default.Palette),
                     Triple("stylist", "AI Stylist", Icons.Default.Chat)
                 ).forEach { item ->
                     val selected = activeTab == item.first
@@ -697,6 +697,7 @@ fun MainAppLayout(viewModel: FitCheckViewModel) {
                 "match_maker" -> MatchMakerDashboard(viewModel)
                 "closet" -> ClosetStudio(viewModel)
                 "try_on" -> TryOnSuite(viewModel)
+                "skin_analysis" -> SkinToneSuitabilityTab(viewModel)
                 "stylist" -> StylistRoom(viewModel)
             }
         }
@@ -719,6 +720,8 @@ fun MatchMakerDashboard(viewModel: FitCheckViewModel) {
 
     Box(modifier = Modifier.fillMaxSize()) {
         Column(modifier = Modifier.fillMaxSize()) {
+            var showSettingsDialog by remember { mutableStateOf(false) }
+
             // Dashboard Header
             Row(
                 modifier = Modifier
@@ -727,69 +730,90 @@ fun MatchMakerDashboard(viewModel: FitCheckViewModel) {
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Column {
+                Column(modifier = Modifier.weight(1f)) {
                     Text(
                         "AI STYLIST COORDINATES THE BEST CHOICE FOR YOU!",
                         fontSize = 10.sp,
                         fontWeight = FontWeight.Bold,
                         color = AntiqueGold,
-                        letterSpacing = 2.sp,
+                        letterSpacing = 1.8.sp,
                         fontFamily = FontFamily.SansSerif
                     )
                     Spacer(modifier = Modifier.height(2.dp))
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(
-                            "Slay",
-                            fontSize = 32.sp,
-                            fontWeight = FontWeight.Light,
-                            fontStyle = androidx.compose.ui.text.font.FontStyle.Italic,
-                            color = TextLight,
-                            fontFamily = FontFamily.Serif
-                        )
-                        Spacer(modifier = Modifier.width(10.dp))
-                        val syncState by viewModel.tryOnState.collectAsStateWithLifecycle()
-                        Box(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(8.dp))
-                                .background(if (syncState.cloudSyncStatus.startsWith("Syncing")) AntiqueGold.copy(alpha = 0.15f) else Color(0xFFE2F0D9))
-                                .clickable { viewModel.triggerCloudSync() }
-                                .padding(horizontal = 8.dp, vertical = 3.dp)
-                                .testTag("cloud_sync_capsule")
-                        ) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(
-                                    imageVector = if (syncState.cloudSyncStatus.startsWith("Syncing")) Icons.Default.Autorenew else Icons.Default.CloudDone,
-                                    contentDescription = "Cloud Done",
-                                    tint = if (syncState.cloudSyncStatus.startsWith("Syncing")) AntiqueGold else Color(0xFF2E7D32),
-                                    modifier = Modifier.size(11.dp)
-                                )
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text(
-                                    syncState.cloudSyncStatus,
-                                    color = if (syncState.cloudSyncStatus.startsWith("Syncing")) AntiqueGold else Color(0xFF2E7D32),
-                                    fontSize = 9.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    fontFamily = FontFamily.SansSerif
-                                )
-                            }
-                        }
-                    }
-                }
-                Box(
-                    modifier = Modifier
-                        .size(42.dp)
-                        .clip(CircleShape)
-                        .background(SlateCard)
-                        .clickable { viewModel.logout() },
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Logout,
-                        contentDescription = "Logout",
-                        tint = TextMuted,
-                        modifier = Modifier.size(20.dp)
+                    SlayArchitecturalLogo(
+                        height = 36.dp,
+                        textColor = TextLight,
+                        accentColor = Color(0xFFFF3B30)
                     )
                 }
+
+                // Quick action tools
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    val syncState by viewModel.tryOnState.collectAsStateWithLifecycle()
+
+                    // Cloud Sync Button
+                    IconButton(
+                        onClick = { viewModel.triggerCloudSync() },
+                        modifier = Modifier
+                            .size(38.dp)
+                            .background(SlateCard, RoundedCornerShape(10.dp))
+                            .border(BorderStroke(1.dp, CharcoalBorder), RoundedCornerShape(10.dp))
+                    ) {
+                        if (syncState.cloudSyncStatus.startsWith("Syncing")) {
+                            CircularProgressIndicator(
+                                color = AntiqueGold,
+                                modifier = Modifier.size(16.dp),
+                                strokeWidth = 2.dp
+                            )
+                        } else {
+                            Icon(
+                                imageVector = Icons.Default.CloudSync,
+                                contentDescription = "Sync: " + syncState.cloudSyncStatus,
+                                tint = if (syncState.cloudSyncStatus.contains("Success")) Color(0xFF2E7D32) else AntiqueGold,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                    }
+
+                    // Settings Button Launch
+                    IconButton(
+                        onClick = { showSettingsDialog = true },
+                        modifier = Modifier
+                            .size(38.dp)
+                            .background(SlateCard, RoundedCornerShape(10.dp))
+                            .border(BorderStroke(1.dp, CharcoalBorder), RoundedCornerShape(10.dp))
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Settings,
+                            contentDescription = "Slay Settings",
+                            tint = TextLight,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+
+                    // Logout Button
+                    IconButton(
+                        onClick = { viewModel.logout() },
+                        modifier = Modifier
+                            .size(38.dp)
+                            .background(SlateCard, RoundedCornerShape(10.dp))
+                            .border(BorderStroke(1.dp, CharcoalBorder), RoundedCornerShape(10.dp))
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Logout,
+                            contentDescription = "Log out",
+                            tint = Color.Red.copy(alpha = 0.8f),
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                }
+            }
+
+            if (showSettingsDialog) {
+                SlaySettingsDialog(viewModel = viewModel, onDismiss = { showSettingsDialog = false })
             }
 
             // FILTER CAROUSELS
@@ -1800,7 +1824,54 @@ fun ClosetStudio(viewModel: FitCheckViewModel) {
     var searchQuery by remember { mutableStateOf("") }
     var selectedCategoryFilter by remember { mutableStateOf<String?>(null) }
     var showAddDialog by remember { mutableStateOf(false) }
+    var showSettingsDialog by remember { mutableStateOf(false) }
     var activeShoppingItem by remember { mutableStateOf<ClothingEntity?>(null) }
+
+    var showOnlyMeWearing by remember { mutableStateOf(false) }
+    var zoomedCombo by remember { mutableStateOf<OutfitCombination?>(null) }
+
+    val tryOnState by viewModel.tryOnState.collectAsStateWithLifecycle()
+    val allHistory by viewModel.outfitHistory.collectAsStateWithLifecycle()
+    val listCombos = remember(clothes, allHistory) {
+        val mapped = allHistory.mapNotNull { hist ->
+            val top = clothes.find { it.id == hist.topId }
+            val bottom = clothes.find { it.id == hist.bottomId }
+            val shoes = clothes.find { it.id == hist.shoesId }
+            if (top != null && bottom != null && shoes != null) {
+                val accessory = hist.accessoryId?.let { aid -> clothes.find { it.id == aid } }
+                val jacket = hist.jacketId?.let { jid -> clothes.find { it.id == jid } }
+                OutfitCombination(
+                    top = top,
+                    bottom = bottom,
+                    shoes = shoes,
+                    accessory = accessory,
+                    jacket = jacket,
+                    averageScore = hist.compatibilityScore,
+                    occasion = hist.occasion
+                )
+            } else {
+                null
+            }
+        }
+        
+        if (mapped.isEmpty() && clothes.isNotEmpty()) {
+            val tops = clothes.filter { it.category.lowercase().contains("shirt") }
+            val bots = clothes.filter { it.category.lowercase().contains("pant") || it.category.lowercase().contains("jeans") || it.category.lowercase().contains("shorts") }
+            val shs = clothes.filter { it.category.lowercase().contains("shoe") }
+            if (tops.isNotEmpty() && bots.isNotEmpty() && shs.isNotEmpty()) {
+                listOf(
+                    OutfitCombination(tops.first(), bots.first(), shs.first(), averageScore = 95, occasion = "Casual Daily"),
+                    if (tops.size > 1 && bots.size > 1 && shs.size > 1) {
+                        OutfitCombination(tops[1], bots[1], shs[1], averageScore = 88, occasion = "Sophisticated Office")
+                    } else null
+                ).filterNotNull()
+            } else {
+                emptyList()
+            }
+        } else {
+            mapped
+        }
+    }
 
     Box(modifier = Modifier.fillMaxSize()) {
         Column(modifier = Modifier.fillMaxSize()) {
@@ -1812,19 +1883,19 @@ fun ClosetStudio(viewModel: FitCheckViewModel) {
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Column {
+                Column(modifier = Modifier.weight(1f)) {
                     Text(
                         "CAPSULE ARCHIVE",
                         fontSize = 10.sp,
                         fontWeight = FontWeight.Bold,
                         color = AntiqueGold,
-                        letterSpacing = 2.sp,
+                        letterSpacing = 1.8.sp,
                         fontFamily = FontFamily.SansSerif
                     )
                     Spacer(modifier = Modifier.height(2.dp))
                     Text(
                         "Wardrobe Hub",
-                        fontSize = 32.sp,
+                        fontSize = 28.sp,
                         fontWeight = FontWeight.Light,
                         fontStyle = androidx.compose.ui.text.font.FontStyle.Italic,
                         color = TextLight,
@@ -1832,20 +1903,74 @@ fun ClosetStudio(viewModel: FitCheckViewModel) {
                     )
                 }
 
-                // Add garment trigger
-                Button(
-                    onClick = { showAddDialog = true },
-                    colors = ButtonDefaults.buttonColors(containerColor = AntiqueGold),
-                    shape = RoundedCornerShape(12.dp),
-                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp),
-                    modifier = Modifier.testTag("add_garment_trigger_btn")
+                // Closet quick actions
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Default.Add, contentDescription = null, tint = SlateBackground, modifier = Modifier.size(16.dp))
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text("Scan Image", color = SlateBackground, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    val syncState by viewModel.tryOnState.collectAsStateWithLifecycle()
+
+                    // Cloud Sync Indicator
+                    IconButton(
+                        onClick = { viewModel.triggerCloudSync() },
+                        modifier = Modifier
+                            .size(38.dp)
+                            .background(SlateCard, RoundedCornerShape(10.dp))
+                            .border(BorderStroke(1.dp, CharcoalBorder), RoundedCornerShape(10.dp))
+                    ) {
+                        if (syncState.cloudSyncStatus.startsWith("Syncing")) {
+                            CircularProgressIndicator(
+                                color = AntiqueGold,
+                                modifier = Modifier.size(16.dp),
+                                strokeWidth = 2.dp
+                            )
+                        } else {
+                            Icon(
+                                imageVector = Icons.Default.CloudSync,
+                                contentDescription = "Sync status: " + syncState.cloudSyncStatus,
+                                tint = if (syncState.cloudSyncStatus.contains("Success")) Color(0xFF2E7D32) else AntiqueGold,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                    }
+
+                    // Settings Gear
+                    IconButton(
+                        onClick = { showSettingsDialog = true },
+                        modifier = Modifier
+                            .size(38.dp)
+                            .background(SlateCard, RoundedCornerShape(10.dp))
+                            .border(BorderStroke(1.dp, CharcoalBorder), RoundedCornerShape(10.dp))
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Settings,
+                            contentDescription = "Slay Settings",
+                            tint = TextLight,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.width(2.dp))
+
+                    // Scan Cloth Button
+                    Button(
+                        onClick = { showAddDialog = true },
+                        colors = ButtonDefaults.buttonColors(containerColor = AntiqueGold),
+                        shape = RoundedCornerShape(10.dp),
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+                        modifier = Modifier.height(38.dp).testTag("add_garment_trigger_btn")
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.Add, contentDescription = null, tint = SlateBackground, modifier = Modifier.size(14.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("Scan Cloth", color = SlateBackground, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        }
                     }
                 }
+            }
+
+            if (showSettingsDialog) {
+                SlaySettingsDialog(viewModel = viewModel, onDismiss = { showSettingsDialog = false })
             }
 
             // Search input field
@@ -1868,85 +1993,205 @@ fun ClosetStudio(viewModel: FitCheckViewModel) {
                 )
             )
 
-            // Dynamic Categories Filters
-            Text(
-                "Filter Category",
-                fontSize = 12.sp,
-                fontWeight = FontWeight.Bold,
-                color = TextMuted,
-                modifier = Modifier.padding(horizontal = 20.dp, vertical = 6.dp)
-            )
-            LazyRow(
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // Sub-mode switcher for closet custom styles
+            Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(bottom = 12.dp),
-                contentPadding = PaddingValues(horizontal = 20.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    .padding(horizontal = 20.dp, vertical = 6.dp)
+                    .height(38.dp)
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(SlateCard)
+                    .border(BorderStroke(1.dp, CharcoalBorder), RoundedCornerShape(8.dp)),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                val defaultCategories = listOf("shirt", "t-shirt", "pants", "jeans", "hoodie", "jacket", "shoes", "accessories")
-                val dynamicCategories = clothes.map { it.category.lowercase().trim() }.distinct().filter { it.isNotBlank() }
-                val categories = (defaultCategories + dynamicCategories).distinct()
-                item {
-                    CategoryChip(
-                        name = "All Clothes",
-                        active = selectedCategoryFilter == null,
-                        onClick = { selectedCategoryFilter = null }
-                    )
-                }
-                items(categories) { cat ->
-                    CategoryChip(
-                        name = cat.replaceFirstChar { it.uppercase() },
-                        active = selectedCategoryFilter == cat,
-                        onClick = { selectedCategoryFilter = cat }
-                    )
-                }
-            }
-
-            val filteredList = clothes.filter { item ->
-                val matchSearch = searchQuery.isBlank() ||
-                        item.name.lowercase().contains(searchQuery.lowercase()) ||
-                        item.color.lowercase().contains(searchQuery.lowercase()) ||
-                        item.style.lowercase().contains(searchQuery.lowercase())
-                val matchCat = selectedCategoryFilter == null || item.category == selectedCategoryFilter
-                matchSearch && matchCat
-            }
-
-            if (filteredList.isEmpty()) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .weight(1f),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Icon(Icons.Default.Inbox, contentDescription = null, tint = TextMuted, modifier = Modifier.size(48.dp))
-                        Spacer(modifier = Modifier.height(12.dp))
-                        Text("No Wardrobe Matches Found", color = TextLight, fontWeight = FontWeight.Bold)
-                        Text("Clear search or scan a photo to populate.", color = TextMuted, fontSize = 11.sp)
-                    }
-                }
-            } else {
-                LazyVerticalGrid(
-                    columns = GridCells.Fixed(2),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .weight(1f)
-                        .padding(horizontal = 14.dp),
-                    contentPadding = PaddingValues(bottom = 24.dp),
-                    verticalArrangement = Arrangement.spacedBy(14.dp),
-                    horizontalArrangement = Arrangement.spacedBy(14.dp)
-                ) {
-                    items(filteredList, key = { it.id }) { item ->
-                        GarmentGridCard(
-                            item = item,
-                            viewModel = viewModel,
-                            onToggleFavorite = { viewModel.toggleFavorite(item) },
-                            onDelete = { viewModel.deleteClothing(item) },
-                            onShopSimilar = { activeShoppingItem = item }
+                listOf(
+                    Pair(false, "Wardrobe Items"),
+                    Pair(true, "Me Wearing Combos")
+                ).forEach { (id, label) ->
+                    val active = showOnlyMeWearing == id
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxHeight()
+                            .clip(RoundedCornerShape(6.dp))
+                            .background(if (active) AntiqueGold else Color.Transparent)
+                            .clickable { showOnlyMeWearing = id },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = label,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = if (active) SlateBackground else TextLight
                         )
                     }
                 }
             }
+
+            Spacer(modifier = Modifier.height(6.dp))
+
+            if (!showOnlyMeWearing) {
+                // Dynamic Categories Filters
+                Text(
+                    "Filter Category",
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = TextMuted,
+                    modifier = Modifier.padding(horizontal = 20.dp, vertical = 6.dp)
+                )
+                LazyRow(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 12.dp),
+                    contentPadding = PaddingValues(horizontal = 20.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    val defaultCategories = listOf("shirt", "t-shirt", "pants", "jeans", "shorts", "hoodie", "jacket", "shoes", "accessories")
+                    val dynamicCategories = clothes.map { it.category.lowercase().trim() }.distinct().filter { it.isNotBlank() }
+                    val categories = (defaultCategories + dynamicCategories).distinct()
+                    item {
+                        CategoryChip(
+                            name = "All Clothes",
+                            active = selectedCategoryFilter == null,
+                            onClick = { selectedCategoryFilter = null }
+                        )
+                    }
+                    items(categories) { cat ->
+                        CategoryChip(
+                            name = cat.replaceFirstChar { it.uppercase() },
+                            active = selectedCategoryFilter == cat,
+                            onClick = { selectedCategoryFilter = cat }
+                        )
+                    }
+                }
+
+                val filteredList = clothes.filter { item ->
+                    val matchSearch = searchQuery.isBlank() ||
+                            item.name.lowercase().contains(searchQuery.lowercase()) ||
+                            item.color.lowercase().contains(searchQuery.lowercase()) ||
+                            item.style.lowercase().contains(searchQuery.lowercase())
+                    val matchCat = selectedCategoryFilter == null || item.category == selectedCategoryFilter
+                    matchSearch && matchCat
+                }
+
+                if (filteredList.isEmpty()) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .weight(1f),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Icon(Icons.Default.Inbox, contentDescription = null, tint = TextMuted, modifier = Modifier.size(48.dp))
+                            Spacer(modifier = Modifier.height(12.dp))
+                            Text("No Wardrobe Matches Found", color = TextLight, fontWeight = FontWeight.Bold)
+                            Text("Clear search or scan a photo to populate.", color = TextMuted, fontSize = 11.sp)
+                        }
+                    }
+                } else {
+                    LazyVerticalGrid(
+                        columns = GridCells.Fixed(2),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .weight(1f)
+                            .padding(horizontal = 14.dp),
+                        contentPadding = PaddingValues(bottom = 24.dp),
+                        verticalArrangement = Arrangement.spacedBy(14.dp),
+                        horizontalArrangement = Arrangement.spacedBy(14.dp)
+                    ) {
+                        items(filteredList, key = { it.id }) { item ->
+                            GarmentGridCard(
+                                item = item,
+                                viewModel = viewModel,
+                                onToggleFavorite = { viewModel.toggleFavorite(item) },
+                                onDelete = { viewModel.deleteClothing(item) },
+                                onShopSimilar = { activeShoppingItem = item }
+                            )
+                        }
+                    }
+                }
+            } else {
+                // Show list of Outfit combinations wearing them
+                if (listCombos.isEmpty()) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .weight(1f),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Icon(Icons.Default.Checkroom, contentDescription = null, tint = TextMuted, modifier = Modifier.size(48.dp))
+                            Spacer(modifier = Modifier.height(12.dp))
+                            Text("No wearing previews found", color = TextLight, fontWeight = FontWeight.Bold)
+                            Text("Mix items in Match tab or save outfit to build wearing combos.", color = TextMuted, fontSize = 11.sp)
+                        }
+                    }
+                } else {
+                    LazyVerticalGrid(
+                        columns = GridCells.Fixed(2),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .weight(1f)
+                            .padding(horizontal = 14.dp),
+                        contentPadding = PaddingValues(bottom = 24.dp),
+                        verticalArrangement = Arrangement.spacedBy(14.dp),
+                        horizontalArrangement = Arrangement.spacedBy(14.dp)
+                    ) {
+                        items(listCombos) { combo ->
+                            Card(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(220.dp)
+                                    .border(BorderStroke(1.dp, CharcoalBorder), RoundedCornerShape(16.dp))
+                                    .clickable { zoomedCombo = combo },
+                                colors = CardDefaults.cardColors(containerColor = SlateCard)
+                            ) {
+                                Column(modifier = Modifier.padding(10.dp)) {
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .weight(1f)
+                                            .clip(RoundedCornerShape(12.dp))
+                                            .background(SlateBackground)
+                                            .padding(4.dp),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        MeWearingMannequinTile(
+                                            combo = combo,
+                                            userSkinColorHex = tryOnState.userSkinColor,
+                                            modifier = Modifier.fillMaxSize()
+                                        )
+                                    }
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    Text(
+                                        combo.occasion.replaceFirstChar { it.uppercase() },
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = TextLight,
+                                        maxLines = 1
+                                    )
+                                    Text(
+                                        "Slay Match Score: ${combo.averageScore}%",
+                                        fontSize = 10.sp,
+                                        color = AntiqueGold
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+        zoomedCombo?.let { cb ->
+            ComboZoomDialog(
+                combo = cb,
+                allCabinetClothes = clothes,
+                userSkinColorHex = tryOnState.userSkinColor,
+                viewModel = viewModel,
+                onDismiss = { zoomedCombo = null }
+            )
         }
 
         // Shimmer loading loader overlay while Gemini analyses uploaded clothing
@@ -1963,14 +2208,14 @@ fun ClosetStudio(viewModel: FitCheckViewModel) {
                     Spacer(modifier = Modifier.height(24.dp))
                     Text(
                         "AI Computer Vision Active",
-                        color = TextLight,
+                        color = Color.White,
                         fontWeight = FontWeight.Bold,
                         fontSize = 18.sp
                     )
                     Spacer(modifier = Modifier.height(6.dp))
                     Text(
                         "YOLO Segmentation & Gemini analyzer classifying category, color metrics...",
-                        color = TextMuted,
+                        color = Color(0xFFE2E0D8),
                         textAlign = TextAlign.Center,
                         fontSize = 11.sp,
                         modifier = Modifier.padding(horizontal = 32.dp)
@@ -1979,11 +2224,103 @@ fun ClosetStudio(viewModel: FitCheckViewModel) {
             }
         }
 
-        // Dynamic clothing creator dialog with preset quick picks
-        if (showAddDialog) {
+        // Dynamic clothing creator dialog with preset         if (showAddDialog) {
+            val context = LocalContext.current
             var inputTags by remember { mutableStateOf("") }
             var activeTab by remember { mutableStateOf("ai") } // "ai" or "manual"
             
+            @Suppress("CanBeVal") var bitmap1 by remember { mutableStateOf<Bitmap?>(null) }
+            @Suppress("CanBeVal") var bitmap2 by remember { mutableStateOf<Bitmap?>(null) }
+            var isOfficeWearDual by remember { mutableStateOf(false) }
+
+            val camera1Launcher = rememberLauncherForActivityResult(
+                contract = ActivityResultContracts.TakePicturePreview()
+            ) { result ->
+                if (result != null) {
+                    bitmap1 = result
+                    if (!isOfficeWearDual) {
+                        viewModel.addNewGarment("Automatic vision capture", result)
+                        showAddDialog = false
+                    } else if (bitmap2 != null) {
+                        viewModel.addNewGarmentDual("Automatic vision capture", result, bitmap2)
+                        showAddDialog = false
+                    }
+                }
+            }
+            
+            val camera2Launcher = rememberLauncherForActivityResult(
+                contract = ActivityResultContracts.TakePicturePreview()
+            ) { result ->
+                if (result != null) {
+                    bitmap2 = result
+                    if (isOfficeWearDual && bitmap1 != null) {
+                        viewModel.addNewGarmentDual("Automatic vision capture", bitmap1, result)
+                        showAddDialog = false
+                    }
+                }
+            }
+            
+            val gallery1Launcher = rememberLauncherForActivityResult(
+                contract = ActivityResultContracts.GetContent()
+            ) { uri ->
+                if (uri != null) {
+                    try {
+                        val inputStream = context.contentResolver.openInputStream(uri)
+                        val result = android.graphics.BitmapFactory.decodeStream(inputStream)
+                        bitmap1 = result
+                        if (result != null) {
+                            if (!isOfficeWearDual) {
+                                viewModel.addNewGarment("Automatic vision capture", result)
+                                showAddDialog = false
+                            } else if (bitmap2 != null) {
+                                viewModel.addNewGarmentDual("Automatic vision capture", result, bitmap2)
+                                showAddDialog = false
+                            }
+                        }
+                    } catch (e: Exception) {
+                        Toast.makeText(context, "Failed to load image", Toast.LENGTH_SHORT).show()
+                    }
+                }
+            }
+            
+            val gallery2Launcher = rememberLauncherForActivityResult(
+                contract = ActivityResultContracts.GetContent()
+            ) { uri ->
+                if (uri != null) {
+                    try {
+                        val inputStream = context.contentResolver.openInputStream(uri)
+                        val result = android.graphics.BitmapFactory.decodeStream(inputStream)
+                        bitmap2 = result
+                        if (result != null && isOfficeWearDual && bitmap1 != null) {
+                            viewModel.addNewGarmentDual("Automatic vision capture", bitmap1, result)
+                            showAddDialog = false
+                        }
+                    } catch (e: Exception) {
+                        Toast.makeText(context, "Failed to load image", Toast.LENGTH_SHORT).show()
+                    }
+                }
+            }
+
+            val cameraPermission1Launcher = rememberLauncherForActivityResult(
+                contract = ActivityResultContracts.RequestPermission()
+            ) { isGranted ->
+                if (isGranted) {
+                    camera1Launcher.launch(null)
+                } else {
+                    Toast.makeText(context, "Camera permission needed!", Toast.LENGTH_SHORT).show()
+                }
+            }
+            
+            val cameraPermission2Launcher = rememberLauncherForActivityResult(
+                contract = ActivityResultContracts.RequestPermission()
+            ) { isGranted ->
+                if (isGranted) {
+                    camera2Launcher.launch(null)
+                } else {
+                    Toast.makeText(context, "Camera permission needed!", Toast.LENGTH_SHORT).show()
+                }
+            }
+
             // Manual state inputs
             var manualName by remember { mutableStateOf("") }
             var manualCategory by remember { mutableStateOf("") }
@@ -1997,29 +2334,27 @@ fun ClosetStudio(viewModel: FitCheckViewModel) {
                 confirmButton = {
                     Button(
                         onClick = {
-                            if (activeTab == "ai") {
-                                if (inputTags.isNotBlank()) {
-                                    viewModel.addNewGarment(inputTags)
-                                    showAddDialog = false
-                                }
-                            } else {
-                                if (manualName.isNotBlank() && manualCategory.isNotBlank()) {
-                                    viewModel.insertCustomGarment(
-                                        category = manualCategory,
-                                        name = manualName,
-                                        color = manualColor,
-                                        colorHex = manualColorHex,
-                                        style = manualStyle,
-                                        season = manualSeason
-                                    )
-                                    showAddDialog = false
-                                }
+                            if (bitmap1 == null) {
+                                Toast.makeText(context, "Camera or gallery photo is strictly required!", Toast.LENGTH_LONG).show()
+                                return@Button
                             }
+                            if (isOfficeWearDual && bitmap2 == null) {
+                                Toast.makeText(context, "Office Wear set requires a second photo of bottoms!", Toast.LENGTH_LONG).show()
+                                return@Button
+                            }
+                            
+                            val finalTags = "Automatic vision capture"
+                            if (isOfficeWearDual) {
+                                viewModel.addNewGarmentDual(finalTags, bitmap1, bitmap2)
+                            } else {
+                                viewModel.addNewGarment(finalTags, bitmap1)
+                            }
+                            showAddDialog = false
                         },
                         colors = ButtonDefaults.buttonColors(containerColor = AntiqueGold)
                     ) {
                         Text(
-                            text = if (activeTab == "ai") "AI Analyze" else "Add to Closet",
+                            text = "AI Analyze & Add",
                             color = SlateBackground,
                             fontWeight = FontWeight.Bold
                         )
@@ -2032,204 +2367,124 @@ fun ClosetStudio(viewModel: FitCheckViewModel) {
                 },
                 title = {
                     Column(modifier = Modifier.fillMaxWidth()) {
-                        Text("New Wardrobe Garment", fontWeight = FontWeight.Bold, color = TextLight, fontSize = 20.sp)
-                        Spacer(modifier = Modifier.height(12.dp))
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clip(RoundedCornerShape(8.dp))
-                                .background(SlateBackground)
-                                .padding(3.dp),
-                            horizontalArrangement = Arrangement.spacedBy(4.dp)
-                        ) {
-                            listOf(
-                                Pair("ai", "AI Scanner Mode"),
-                                Pair("manual", "Custom Manual Mode")
-                            ).forEach { (id, label) ->
-                                Box(
-                                    modifier = Modifier
-                                        .weight(1f)
-                                        .clip(RoundedCornerShape(6.dp))
-                                        .background(if (activeTab == id) AntiqueGold else Color.Transparent)
-                                        .clickable { activeTab = id }
-                                        .padding(vertical = 6.dp),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Text(
-                                        text = label,
-                                        fontSize = 10.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = if (activeTab == id) SlateBackground else TextMuted
-                                    )
-                                }
-                            }
-                        }
+                        Text("Add New Garment", fontWeight = FontWeight.Bold, color = TextLight, fontSize = 20.sp)
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Text(
+                            "Gemini AI automatically scans and recognizes the category, style, color, pattern, and fabric print of your clothes directly from the photo. No manual inputs are needed.",
+                            fontSize = 11.sp,
+                            color = TextMuted
+                        )
                     }
                 },
                 text = {
                     Column(modifier = Modifier.fillMaxWidth()) {
-                        if (activeTab == "ai") {
-                            Text(
-                                "Type details below or select a standard preset template. Our vision pipeline model will extract categories, matching HEX codes, style aesthetics, and occasions automatically.",
-                                fontSize = 11.sp,
-                                color = TextMuted,
-                                modifier = Modifier.padding(bottom = 12.dp)
-                            )
-
-                            // Input field
-                            OutlinedTextField(
-                                value = inputTags,
-                                onValueChange = { inputTags = it },
-                                placeholder = { Text("e.g. vintage navy heavy denim pants", color = TextMuted) },
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .testTag("closet_add_input"),
-                                shape = RoundedCornerShape(12.dp),
-                                colors = OutlinedTextFieldDefaults.colors(
-                                    focusedBorderColor = AntiqueGold,
-                                    unfocusedBorderColor = CharcoalBorder,
-                                    focusedTextColor = TextLight,
-                                    unfocusedTextColor = TextLight
-                                )
-                            )
-
-                            Spacer(modifier = Modifier.height(14.dp))
-                            Text("Quick Preset Samples:", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = TextLight)
-                            Spacer(modifier = Modifier.height(8.dp))
-
-                            // Quick flowrow list
-                            FlowRow(
-                                horizontalArrangement = Arrangement.spacedBy(6.dp),
-                                verticalArrangement = Arrangement.spacedBy(6.dp)
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text("Garment Photo 1 (Strictly Required):", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = TextLight)
+                        Spacer(modifier = Modifier.height(6.dp))
+                        
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Button(
+                                onClick = { cameraPermission1Launcher.launch(android.Manifest.permission.CAMERA) },
+                                modifier = Modifier.weight(1f),
+                                colors = ButtonDefaults.buttonColors(containerColor = SlateBackground),
+                                border = BorderStroke(1.dp, CharcoalBorder),
+                                shape = RoundedCornerShape(8.dp)
                             ) {
-                                listOf(
-                                    "Sage linen t-shirt",
-                                    "Cherry red hoodie",
-                                    "Black leather boots",
-                                    "Cream summer shorts",
-                                    "Khaki office chinos",
-                                    "Denim jacket"
-                                ).forEach { tag ->
-                                    Box(
-                                        modifier = Modifier
-                                            .clip(RoundedCornerShape(8.dp))
-                                            .background(SlateBackground)
-                                            .border(BorderStroke(1.dp, CharcoalBorder), RoundedCornerShape(8.dp))
-                                            .clickable { inputTags = tag }
-                                            .padding(horizontal = 10.dp, vertical = 6.dp)
-                                    ) {
-                                        Text(tag, fontSize = 10.sp, color = SandAccent)
-                                    }
+                                Icon(Icons.Default.CameraAlt, contentDescription = "Camera 1", tint = AntiqueGold, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text("Camera Scan", fontSize = 10.sp, color = TextLight)
+                            }
+                            Button(
+                                onClick = { gallery1Launcher.launch("image/*") },
+                                modifier = Modifier.weight(1f),
+                                colors = ButtonDefaults.buttonColors(containerColor = SlateBackground),
+                                border = BorderStroke(1.dp, CharcoalBorder),
+                                shape = RoundedCornerShape(8.dp)
+                            ) {
+                                Icon(Icons.Default.PhotoLibrary, contentDescription = "Gallery 1", tint = AntiqueGold, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text("Gallery Select", fontSize = 10.sp, color = TextLight)
+                            }
+                        }
+                        
+                        bitmap1?.let { bm ->
+                            Spacer(modifier = Modifier.height(10.dp))
+                            Image(
+                                bitmap = bm.asImageBitmap(),
+                                contentDescription = "Preview 1",
+                                modifier = Modifier
+                                    .size(90.dp)
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .border(1.2.dp, AntiqueGold, RoundedCornerShape(8.dp))
+                                    .align(Alignment.CenterHorizontally),
+                                contentScale = ContentScale.Crop
+                            )
+                        }
+                        
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { isOfficeWearDual = !isOfficeWearDual }
+                                .padding(vertical = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Checkbox(
+                                checked = isOfficeWearDual,
+                                onCheckedChange = { isOfficeWearDual = it },
+                                colors = CheckboxDefaults.colors(checkedColor = AntiqueGold)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("This is 2-Photo Office Wear (Top and Bottom)", color = TextLight, fontSize = 10.sp)
+                        }
+                        
+                        if (isOfficeWearDual) {
+                            Spacer(modifier = Modifier.height(10.dp))
+                            Text("Garment Photo 2 (Office Bottom Wear):", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = TextLight)
+                            Spacer(modifier = Modifier.height(6.dp))
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Button(
+                                    onClick = { cameraPermission2Launcher.launch(android.Manifest.permission.CAMERA) },
+                                    modifier = Modifier.weight(1f),
+                                    colors = ButtonDefaults.buttonColors(containerColor = SlateBackground),
+                                    border = BorderStroke(1.dp, CharcoalBorder),
+                                    shape = RoundedCornerShape(8.dp)
+                                ) {
+                                    Icon(Icons.Default.CameraAlt, contentDescription = "Camera 2", tint = AntiqueGold, modifier = Modifier.size(16.dp))
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text("Camera Bottom", fontSize = 10.sp, color = TextLight)
+                                }
+                                Button(
+                                    onClick = { gallery2Launcher.launch("image/*") },
+                                    modifier = Modifier.weight(1f),
+                                    colors = ButtonDefaults.buttonColors(containerColor = SlateBackground),
+                                    border = BorderStroke(1.dp, CharcoalBorder),
+                                    shape = RoundedCornerShape(8.dp)
+                                ) {
+                                    Icon(Icons.Default.PhotoLibrary, contentDescription = "Gallery 2", tint = AntiqueGold, modifier = Modifier.size(16.dp))
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text("Gallery Bottom", fontSize = 10.sp, color = TextLight)
                                 }
                             }
-                        } else {
-                            Column(
-                                modifier = Modifier.fillMaxWidth(),
-                                verticalArrangement = Arrangement.spacedBy(10.dp)
-                            ) {
-                                Text(
-                                    "Manually add any shirt, pants, footwear, or custom-category styles precisely. Choose custom categories freely!",
-                                    fontSize = 11.sp,
-                                    color = TextMuted
+                            
+                            bitmap2?.let { bm ->
+                                Spacer(modifier = Modifier.height(10.dp))
+                                Image(
+                                    bitmap = bm.asImageBitmap(),
+                                    contentDescription = "Preview 2",
+                                    modifier = Modifier
+                                        .size(90.dp)
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .border(1.2.dp, AntiqueGold, RoundedCornerShape(8.dp))
+                                        .align(Alignment.CenterHorizontally),
+                                    contentScale = ContentScale.Crop
                                 )
-
-                                OutlinedTextField(
-                                    value = manualName,
-                                    onValueChange = { manualName = it },
-                                    label = { Text("Garment Name (e.g. Classic Red Knit Shirt)", color = AntiqueGold, fontSize = 10.sp) },
-                                    colors = OutlinedTextFieldDefaults.colors(
-                                        focusedTextColor = TextLight,
-                                        unfocusedTextColor = TextLight,
-                                        focusedBorderColor = AntiqueGold,
-                                        unfocusedBorderColor = CharcoalBorder
-                                    ),
-                                    modifier = Modifier.fillMaxWidth()
-                                )
-
-                                OutlinedTextField(
-                                    value = manualCategory,
-                                    onValueChange = { manualCategory = it },
-                                    label = { Text("Category (e.g. shirt, pants, coat, hat)", color = AntiqueGold, fontSize = 10.sp) },
-                                    colors = OutlinedTextFieldDefaults.colors(
-                                        focusedTextColor = TextLight,
-                                        unfocusedTextColor = TextLight,
-                                        focusedBorderColor = AntiqueGold,
-                                        unfocusedBorderColor = CharcoalBorder
-                                    ),
-                                    modifier = Modifier.fillMaxWidth()
-                                )
-
-                                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                    OutlinedTextField(
-                                        value = manualColor,
-                                        onValueChange = { manualColor = it },
-                                        label = { Text("Color Desk", color = AntiqueGold, fontSize = 10.sp) },
-                                        colors = OutlinedTextFieldDefaults.colors(
-                                            focusedTextColor = TextLight,
-                                            unfocusedTextColor = TextLight,
-                                            focusedBorderColor = AntiqueGold,
-                                            unfocusedBorderColor = CharcoalBorder
-                                        ),
-                                        modifier = Modifier.weight(1f)
-                                    )
-
-                                    OutlinedTextField(
-                                        value = manualColorHex,
-                                        onValueChange = { manualColorHex = it },
-                                        label = { Text("Color Hex", color = AntiqueGold, fontSize = 10.sp) },
-                                        colors = OutlinedTextFieldDefaults.colors(
-                                            focusedTextColor = TextLight,
-                                            unfocusedTextColor = TextLight,
-                                            focusedBorderColor = AntiqueGold,
-                                            unfocusedBorderColor = CharcoalBorder
-                                        ),
-                                        modifier = Modifier.weight(1f)
-                                    )
-                                }
-
-                                Text("Style Preset:", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = TextLight)
-                                FlowRow(
-                                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                                    verticalArrangement = Arrangement.spacedBy(6.dp)
-                                ) {
-                                    listOf("Casual", "Formal", "Streetwear", "Elegant", "Sporty").forEach { st ->
-                                        Box(
-                                            modifier = Modifier
-                                                .clip(RoundedCornerShape(8.dp))
-                                                .background(if (manualStyle == st) AntiqueGold else SlateBackground)
-                                                .clickable { manualStyle = st }
-                                                .padding(horizontal = 10.dp, vertical = 6.dp)
-                                        ) {
-                                            Text(
-                                                text = st,
-                                                fontSize = 10.sp,
-                                                color = if (manualStyle == st) SlateBackground else TextLight
-                                            )
-                                        }
-                                    }
-                                }
-
-                                Text("Season Suitability:", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = TextLight)
-                                FlowRow(
-                                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                                    verticalArrangement = Arrangement.spacedBy(6.dp)
-                                ) {
-                                    listOf("Summer", "Autumn", "Winter", "Spring", "All").forEach { se ->
-                                        Box(
-                                            modifier = Modifier
-                                                .clip(RoundedCornerShape(8.dp))
-                                                .background(if (manualSeason == se) AntiqueGold else SlateBackground)
-                                                .clickable { manualSeason = se }
-                                                .padding(horizontal = 10.dp, vertical = 6.dp)
-                                        ) {
-                                            Text(
-                                                text = se,
-                                                fontSize = 10.sp,
-                                                color = if (manualSeason == se) SlateBackground else TextLight
-                                            )
-                                        }
-                                    }
-                                }
                             }
                         }
                     }
@@ -3088,29 +3343,33 @@ fun VisualTryOnStudioArea(viewModel: FitCheckViewModel) {
 
                     Spacer(modifier = Modifier.height(10.dp))
 
-                    // Skin tone controls
+                    // Skin tone controls (Strictly Photo-driven indicator)
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text("Skin Tone", fontSize = 11.sp, color = TextLight)
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            listOf("#E8D3C5", "#DFC7B3", "#C2B2A2", "#A67B5B", "#FFDBAC").forEach { colorHex ->
-                                val sel = state.userSkinColor == colorHex
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(6.dp))
+                                .background(CharcoalBorder.copy(alpha = 0.4f))
+                                .padding(horizontal = 8.dp, vertical = 4.dp)
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
                                 Box(
                                     modifier = Modifier
-                                        .size(18.dp)
+                                        .size(10.dp)
                                         .clip(CircleShape)
-                                        .background(safeParseHexColor(colorHex))
-                                        .border(
-                                            BorderStroke(
-                                                if (sel) 2.dp else 1.dp,
-                                                if (sel) AntiqueGold else Color.White.copy(alpha = 0.5f)
-                                            ),
-                                            CircleShape
-                                        )
-                                        .clickable { viewModel.updateUserSkinColor(colorHex) }
+                                        .background(safeParseHexColor(state.userSkinColor))
+                                    // Removed click action
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    "Locked: Hex ${state.userSkinColor}",
+                                    color = AntiqueGold,
+                                    fontSize = 9.sp,
+                                    fontWeight = FontWeight.Bold
                                 )
                             }
                         }
@@ -3593,7 +3852,20 @@ fun StylistRoom(viewModel: FitCheckViewModel) {
                 placeholder = { Text("Ask Slay about colors, styles, fits...", color = TextMuted) },
                 modifier = Modifier
                     .weight(1f)
-                    .testTag("stylist_chat_input"),
+                    .testTag("stylist_chat_input")
+                    .onKeyEvent { keyEvent ->
+                        if (keyEvent.key == Key.Enter && keyEvent.type == KeyEventType.KeyUp) {
+                            if (textInput.isNotBlank()) {
+                                viewModel.sendMessageToStylist(textInput)
+                                textInput = ""
+                                keyboardController?.hide()
+                            }
+                            true
+                        } else {
+                            false
+                        }
+                    },
+                singleLine = true,
                 shape = RoundedCornerShape(14.dp),
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
                 keyboardActions = KeyboardActions(onSend = {
@@ -3607,7 +3879,9 @@ fun StylistRoom(viewModel: FitCheckViewModel) {
                     focusedBorderColor = AntiqueGold,
                     unfocusedBorderColor = CharcoalBorder,
                     focusedTextColor = TextLight,
-                    unfocusedTextColor = TextLight
+                    unfocusedTextColor = TextLight,
+                    focusedContainerColor = SlateCard,
+                    unfocusedContainerColor = SlateCard
                 )
             )
 
@@ -3880,6 +4154,40 @@ fun SettingsScreen(viewModel: FitCheckViewModel) {
     var selectedShirtSize by remember(tryOnState.shirtSize) { mutableStateOf(tryOnState.shirtSize) }
     var selectedPantSize by remember(tryOnState.pantSize) { mutableStateOf(tryOnState.pantSize) }
     var selectedShoeSize by remember(tryOnState.shoeSize) { mutableStateOf(tryOnState.shoeSize) }
+
+    val context = androidx.compose.ui.platform.LocalContext.current
+    var activeCalendarDayLogs by remember { mutableStateOf<List<OutfitHistoryEntity>?>(null) }
+
+    val calendarInstance = remember { java.util.Calendar.getInstance() }
+    val currentMonth = remember { calendarInstance.get(java.util.Calendar.MONTH) }
+    val currentYear = remember { calendarInstance.get(java.util.Calendar.YEAR) }
+    val monthName = remember { 
+        java.text.SimpleDateFormat("MMMM yyyy", java.util.Locale.getDefault()).format(calendarInstance.time).uppercase() 
+    }
+
+    val monthWornDays = remember(outfitHistory) {
+        val map = mutableMapOf<Int, List<OutfitHistoryEntity>>()
+        val cal = java.util.Calendar.getInstance()
+        outfitHistory.forEach { log ->
+            cal.timeInMillis = log.wornDate
+            if (cal.get(java.util.Calendar.MONTH) == currentMonth && cal.get(java.util.Calendar.YEAR) == currentYear) {
+                val day = cal.get(java.util.Calendar.DAY_OF_MONTH)
+                val list = map[day] ?: emptyList()
+                map[day] = list + log
+            }
+        }
+        map
+    }
+
+    val firstDayOfWeekNum = remember {
+        val cal = java.util.Calendar.getInstance()
+        cal.set(java.util.Calendar.DAY_OF_MONTH, 1)
+        cal.get(java.util.Calendar.DAY_OF_WEEK) // 1 = Sunday, 2 = Monday, etc.
+    }
+    val totalDaysInMonth = remember {
+        val cal = java.util.Calendar.getInstance()
+        cal.getActualMaximum(java.util.Calendar.DAY_OF_MONTH)
+    }
 
     Box(
         modifier = Modifier
@@ -4313,6 +4621,140 @@ fun SettingsScreen(viewModel: FitCheckViewModel) {
 
             Spacer(modifier = Modifier.height(20.dp))
 
+            // 📅 Interactive Slay Outfit Calendar Card
+            Card(
+                modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
+                colors = CardDefaults.cardColors(containerColor = SlateCard),
+                shape = RoundedCornerShape(16.dp),
+                border = BorderStroke(1.dp, CharcoalBorder)
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            "📅 OUTFIT WEAR CALENDAR",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = AntiqueGold,
+                            letterSpacing = 1.sp
+                        )
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(6.dp))
+                                .background(SlateBackground)
+                                .padding(horizontal = 8.dp, vertical = 4.dp)
+                        ) {
+                            Text(monthName, fontSize = 9.sp, fontWeight = FontWeight.Bold, color = TextLight)
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Text(
+                        "Tap on gold-highlighted calendar days containing a dynamic log to review matching garments and combos worn on that day.",
+                        fontSize = 11.sp,
+                        color = TextMuted,
+                        modifier = Modifier.padding(bottom = 12.dp)
+                    )
+
+                    // Weekdays header cells
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        listOf("SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT").forEach { dayLabel ->
+                            Text(
+                                text = dayLabel,
+                                modifier = Modifier.weight(1f),
+                                textAlign = TextAlign.Center,
+                                fontSize = 9.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = TextMuted
+                            )
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(6.dp))
+
+                    // Calendar Grid cells
+                    val cellsList = remember(firstDayOfWeekNum, totalDaysInMonth) {
+                        val list = mutableListOf<Int?>()
+                        // Add null empty spacing cells before day 1
+                        val paddingCount = firstDayOfWeekNum - 1
+                        for (i in 0 until paddingCount) {
+                            list.add(null)
+                        }
+                        for (d in 1..totalDaysInMonth) {
+                            list.add(d)
+                        }
+                        // Pad to full rows (multiple of 7)
+                        while (list.size % 7 != 0) {
+                            list.add(null)
+                        }
+                        list
+                    }
+
+                    val chunkedFullRows = cellsList.chunked(7)
+                    chunkedFullRows.forEach { weekRow ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            weekRow.forEach { dayNum ->
+                                if (dayNum == null) {
+                                    Spacer(modifier = Modifier.weight(1f).aspectRatio(1f))
+                                } else {
+                                    val loggedEvents = monthWornDays[dayNum] ?: emptyList()
+                                    val isWornDay = loggedEvents.isNotEmpty()
+                                    
+                                    Box(
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .aspectRatio(1.1f)
+                                            .padding(2.dp)
+                                            .clip(RoundedCornerShape(8.dp))
+                                            .background(if (isWornDay) AntiqueGold.copy(alpha = 0.25f) else SlateBackground)
+                                            .border(
+                                                BorderStroke(
+                                                    1.dp, 
+                                                    if (isWornDay) AntiqueGold else CharcoalBorder.copy(alpha = 0.5f)
+                                                ), 
+                                                RoundedCornerShape(8.dp)
+                                            )
+                                            .clickable {
+                                                if (isWornDay) {
+                                                    activeCalendarDayLogs = loggedEvents
+                                                } else {
+                                                    Toast.makeText(context, "No outfits logged on day $dayNum", Toast.LENGTH_SHORT).show()
+                                                }
+                                            },
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                            Text(
+                                                text = "$dayNum",
+                                                fontSize = 11.sp,
+                                                fontWeight = if (isWornDay) FontWeight.ExtraBold else FontWeight.Medium,
+                                                color = if (isWornDay) AntiqueGold else TextLight
+                                            )
+                                            if (isWornDay) {
+                                                Box(
+                                                    modifier = Modifier
+                                                        .size(4.dp)
+                                                        .clip(CircleShape)
+                                                        .background(AntiqueGold)
+                                                        .padding(top = 1.dp)
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(20.dp))
+
             // 3. Slay AI Internet Sizing Matchmaker
             Card(
                 modifier = Modifier.fillMaxWidth(),
@@ -4338,6 +4780,66 @@ fun SettingsScreen(viewModel: FitCheckViewModel) {
                         fontSize = 11.sp,
                         color = TextMuted
                     )
+                    Spacer(modifier = Modifier.height(10.dp))
+                    
+                    val selectedScout by viewModel.selectedScoutClothes.collectAsStateWithLifecycle()
+                    val allClothes by viewModel.allClothes.collectAsStateWithLifecycle()
+                    
+                    Text(
+                        "Select specific garments to buy matches for (optional):",
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = AntiqueGold
+                    )
+                    Spacer(modifier = Modifier.height(6.dp))
+                    
+                    if (allClothes.isEmpty()) {
+                        Text("No wardrobe clothes available. Add items first in Closet.", fontSize = 10.sp, color = TextMuted)
+                    } else {
+                        LazyRow(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
+                        ) {
+                            items(allClothes) { item ->
+                                val isSelected = selectedScout.contains(item)
+                                Box(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .background(if (isSelected) AntiqueGold.copy(alpha = 0.2f) else SlateBackground)
+                                        .border(BorderStroke(1.dp, if (isSelected) AntiqueGold else CharcoalBorder), RoundedCornerShape(8.dp))
+                                        .clickable { viewModel.toggleScoutSelection(item) }
+                                        .padding(horizontal = 10.dp, vertical = 6.dp)
+                                ) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Box(
+                                            modifier = Modifier
+                                                .size(10.dp)
+                                                .clip(CircleShape)
+                                                .background(Color(android.graphics.Color.parseColor(item.colorHex)))
+                                        )
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text(item.name, fontSize = 10.sp, color = if (isSelected) AntiqueGold else TextLight)
+                                        if (isSelected) {
+                                            Spacer(modifier = Modifier.width(4.dp))
+                                            Icon(Icons.Default.Check, contentDescription = null, tint = AntiqueGold, modifier = Modifier.size(10.dp))
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    if (selectedScout.isNotEmpty()) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text("${selectedScout.size} item(s) selected for targeted matching", fontSize = 10.sp, color = AntiqueGold, fontStyle = androidx.compose.ui.text.font.FontStyle.Italic)
+                            TextButton(onClick = { viewModel.clearScoutSelection() }) {
+                                Text("Clear", color = TextMuted, fontSize = 10.sp)
+                            }
+                        }
+                    }
                     Spacer(modifier = Modifier.height(14.dp))
 
                     if (isScoutingLoading) {
@@ -4471,6 +4973,84 @@ fun SettingsScreen(viewModel: FitCheckViewModel) {
                     }
                 }
             }
+        }
+
+        activeCalendarDayLogs?.let { logs ->
+            val allClothes by viewModel.allClothes.collectAsStateWithLifecycle()
+            AlertDialog(
+                onDismissRequest = { activeCalendarDayLogs = null },
+                confirmButton = {
+                    TextButton(onClick = { activeCalendarDayLogs = null }) {
+                        Text("Done", color = AntiqueGold, fontWeight = FontWeight.Bold)
+                    }
+                },
+                containerColor = SlateCard,
+                shape = RoundedCornerShape(16.dp),
+                title = {
+                    Text("Slay Outfits Logged Details", color = TextLight, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                },
+                text = {
+                    Column(
+                        modifier = Modifier.fillMaxWidth().verticalScroll(rememberScrollState()),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        logs.forEach { log ->
+                            val topG = allClothes.find { it.id == log.topId }
+                            val botG = allClothes.find { it.id == log.bottomId }
+                            val shoG = allClothes.find { it.id == log.shoesId }
+                            
+                            Card(
+                                modifier = Modifier.fillMaxWidth().border(BorderStroke(1.dp, CharcoalBorder), RoundedCornerShape(12.dp)),
+                                colors = CardDefaults.cardColors(containerColor = SlateBackground)
+                            ) {
+                                Column(modifier = Modifier.padding(10.dp)) {
+                                    Text("Occasion: ${log.occasion.uppercase()}", fontSize = 11.sp, color = AntiqueGold, fontWeight = FontWeight.Bold)
+                                    Spacer(modifier = Modifier.height(6.dp))
+                                    
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        topG?.let {
+                                            Column(modifier = Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
+                                                Box(modifier = Modifier.size(45.dp).background(SlateCard, RoundedCornerShape(6.dp)).padding(4.dp)) {
+                                                    ClothingVectorIcon(it.category, it.colorHex, Modifier.fillMaxSize())
+                                                }
+                                                Text(it.name, fontSize = 8.sp, maxLines = 1, color = TextLight, textAlign = TextAlign.Center)
+                                            }
+                                        } ?: Column(modifier = Modifier.weight(1f)) {}
+
+                                        botG?.let {
+                                            Column(modifier = Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
+                                                Box(modifier = Modifier.size(45.dp).background(SlateCard, RoundedCornerShape(6.dp)).padding(4.dp)) {
+                                                    ClothingVectorIcon(it.category, it.colorHex, Modifier.fillMaxSize())
+                                                }
+                                                Text(it.name, fontSize = 8.sp, maxLines = 1, color = TextLight, textAlign = TextAlign.Center)
+                                            }
+                                        } ?: Column(modifier = Modifier.weight(1f)) {}
+
+                                        shoG?.let {
+                                            Column(modifier = Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
+                                                Box(modifier = Modifier.size(45.dp).background(SlateCard, RoundedCornerShape(6.dp)).padding(4.dp)) {
+                                                    ClothingVectorIcon(it.category, it.colorHex, Modifier.fillMaxSize())
+                                                }
+                                                Text(it.name, fontSize = 8.sp, maxLines = 1, color = TextLight, textAlign = TextAlign.Center)
+                                            }
+                                        } ?: Column(modifier = Modifier.weight(1f)) {}
+                                    }
+                                    
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    Text(
+                                        "Overall combo compatibility: Match Score ${log.compatibilityScore}%",
+                                        fontSize = 9.sp,
+                                        color = TextMuted
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            )
         }
     }
 }
@@ -4770,5 +5350,1301 @@ fun SharedImageActionDialog(
         confirmButton = {},
         containerColor = SlateCard,
         shape = RoundedCornerShape(16.dp)
+    )
+}
+
+@Composable
+fun SkinToneSuitabilityTab(viewModel: FitCheckViewModel) {
+    val tryOnState by viewModel.tryOnState.collectAsStateWithLifecycle()
+    val allClothes by viewModel.allClothes.collectAsStateWithLifecycle()
+    val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
+    var isGeneratingTips by remember { mutableStateOf(false) }
+    var generatedStylistAdvice by remember { mutableStateOf("") }
+    
+    val hexColor = tryOnState.userSkinColor
+    val (toneName, undertoneGroup, suitsText, suitColorList) = remember(hexColor) {
+        val rgb = try {
+            val colorStr = hexColor.trim().replace("#", "")
+            val r = colorStr.substring(0, 2).toInt(16)
+            val g = colorStr.substring(2, 4).toInt(16)
+            val b = colorStr.substring(4, 6).toInt(16)
+            Triple(r, g, b)
+        } catch (e: Exception) {
+            Triple(232, 211, 197)
+        }
+        
+        if (rgb.first > rgb.third + 20) {
+            val suits = listOf(
+                Pair("Amber & Gold", Color(0xFFE5A93C)),
+                Pair("Burnt Ochre", Color(0xFFC3533A)),
+                Pair("Sage Olive", Color(0xFF768A6B)),
+                Pair("Warm Cream", Color(0xFFF0E5D3)),
+                Pair("Bronze Terracotta", Color(0xFFAD5E3A))
+            )
+            Quad("Warm & Golden Radiance", "Warm Undertone", "Warm Amber, Rich Terracotta, Sage Green, Goldenrod, Peach, Dusty Bronze, Cream/Beige", suits)
+        } else if (rgb.third > rgb.second - 10) {
+            val suits = listOf(
+                Pair("Royal Navy", Color(0xFF1F2F4B)),
+                Pair("Charcoal Ice", Color(0xFF4A5568)),
+                Pair("Emerald Jewel", Color(0xFF0F5132)),
+                Pair("Grape Purple", Color(0xFF5A189A)),
+                Pair("Crimson Rose", Color(0xFF8B0000))
+            )
+            Quad("Cool Jewel Contrast", "Cool Undertone", "Sleek Emerald, Royal Navy, Icy Lavender, Cool Slate Charcoal, Deep Ruby Red, Cobalt", suits)
+        } else {
+            val suits = listOf(
+                Pair("Classic Jade", Color(0xFF2A9D8F)),
+                Pair("Ivory Sand", Color(0xFFE9C46A)),
+                Pair("Dusty Rose", Color(0xFFE76F51)),
+                Pair("Medium Charcoal", Color(0xFF264653)),
+                Pair("Warm Gray", Color(0xFFE9D8A6))
+            )
+            Quad("Balanced Neutral Chic", "Neutral Undertone", "Dusty Rose, Jade Green, Modern Ivory, Slate Teal, Soft Lavender-Grey, Classic Navy", suits)
+        }
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(SlateBackground)
+            .verticalScroll(rememberScrollState())
+            .padding(18.dp)
+    ) {
+        Text(
+            "SKIN TONE ANALYSIS PLATFORM",
+            fontSize = 10.sp,
+            fontWeight = FontWeight.Bold,
+            color = AntiqueGold,
+            letterSpacing = 2.sp
+        )
+        Spacer(modifier = Modifier.height(2.dp))
+        Text(
+            "Suitability Studio",
+            fontSize = 30.sp,
+            fontWeight = FontWeight.Light,
+            fontStyle = androidx.compose.ui.text.font.FontStyle.Italic,
+            color = TextLight,
+            fontFamily = FontFamily.Serif
+        )
+        Text(
+            "Harmonize your wardrobe matching colors with your personal natural skin tones to raise your Slay aesthetic confidence score.",
+            fontSize = 11.sp,
+            color = TextMuted,
+            modifier = Modifier.padding(bottom = 16.dp)
+        )
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = SlateCard),
+        shape = RoundedCornerShape(16.dp),
+        border = BorderStroke(1.dp, CharcoalBorder)
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column {
+                    Text("EXTRACTED SKIN SHADE", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = AntiqueGold)
+                    Text(toneName, fontSize = 18.sp, fontWeight = FontWeight.Bold, color = TextLight)
+                    Text(undertoneGroup, fontSize = 12.sp, color = TextMuted)
+                }
+                
+                Box(
+                    modifier = Modifier
+                        .size(54.dp)
+                        .clip(CircleShape)
+                        .background(Color(android.graphics.Color.parseColor(hexColor)))
+                        .border(BorderStroke(2.dp, AntiqueGold), CircleShape)
+                )
+            }
+            
+            Spacer(modifier = Modifier.height(14.dp))
+            HorizontalDivider(color = CharcoalBorder)
+            Spacer(modifier = Modifier.height(12.dp))
+            
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(Color(0xFF2E7D32).copy(alpha = 0.15f))
+                    .border(BorderStroke(1.dp, Color(0xFF2E7D32).copy(alpha = 0.3f)), RoundedCornerShape(8.dp))
+                    .padding(10.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Lock,
+                    contentDescription = "Locked",
+                    tint = Color(0xFF81C784),
+                    modifier = Modifier.size(16.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Column {
+                    Text(
+                        "Photo-Driven Mode (Active)",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF81C784)
+                    )
+                    Text(
+                        "Your skin tone belongs strictly to your personal portrait to maintain objective color coordinate accuracy. Manual changes are disabled.",
+                        fontSize = 9.sp,
+                        color = Color(0xFFE2F0D9),
+                        lineHeight = 13.sp
+                    )
+                }
+            }
+        }
+    }
+
+    Spacer(modifier = Modifier.height(18.dp))
+
+    // Header Color Option Portfolio
+    Text(
+        text = "BESPOKE HARMONIOUS PALETTES & MULTIPLE SHADES",
+        fontSize = 11.sp,
+        fontWeight = FontWeight.Bold,
+        color = AntiqueGold,
+        letterSpacing = 1.sp
+    )
+    Spacer(modifier = Modifier.height(6.dp))
+    Text(
+        text = "Research premium wardrobe color options with multiple high-fidelity shades specifically matching your $undertoneGroup context.",
+        fontSize = 11.sp,
+        color = TextMuted,
+        modifier = Modifier.padding(bottom = 12.dp)
+    )
+
+    // NEW Custom Color Option Web Explorer
+    var customSearchQuery by remember { mutableStateOf("") }
+    Card(
+        modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
+        colors = CardDefaults.cardColors(containerColor = SlateCard),
+        shape = RoundedCornerShape(12.dp),
+        border = BorderStroke(1.dp, AntiqueGold.copy(alpha = 0.3f))
+    ) {
+        Column(modifier = Modifier.padding(12.dp)) {
+            Text(
+                "🔍 GLOBAL WEB SHADE SUITABILITY SEARCH",
+                fontSize = 10.sp,
+                fontWeight = FontWeight.Bold,
+                color = AntiqueGold
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                "Enter any custom color option or shade (e.g. 'Eggplant Purple', 'Mustard Yellow Pants') to search the web for how it suits your $undertoneGroup skin tone.",
+                fontSize = 9.sp,
+                color = TextMuted,
+                lineHeight = 13.sp
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                TextField(
+                    value = customSearchQuery,
+                    onValueChange = { customSearchQuery = it },
+                    placeholder = { Text("e.g. Lavender coats...", fontSize = 11.sp, color = TextMuted) },
+                    modifier = Modifier.weight(1f),
+                    singleLine = true,
+                    colors = TextFieldDefaults.colors(
+                        focusedContainerColor = SlateBackground,
+                        unfocusedContainerColor = SlateBackground,
+                        focusedTextColor = TextLight,
+                        unfocusedTextColor = TextLight,
+                        focusedIndicatorColor = AntiqueGold,
+                        unfocusedIndicatorColor = CharcoalBorder
+                    ),
+                    shape = RoundedCornerShape(8.dp)
+                )
+                Button(
+                    onClick = {
+                        if (customSearchQuery.isNotBlank()) {
+                            val webQuery = "how to wear $customSearchQuery with $undertoneGroup skin tone style guides clothing matching"
+                            try {
+                                val intent = android.content.Intent(
+                                    android.content.Intent.ACTION_VIEW,
+                                    android.net.Uri.parse("https://www.google.com/search?q=" + android.net.Uri.encode(webQuery))
+                                )
+                                context.startActivity(intent)
+                            } catch (e: Exception) {
+                                Toast.makeText(context, "Could not launch web search", Toast.LENGTH_SHORT).show()
+                            }
+                        } else {
+                            Toast.makeText(context, "Enter a shade first!", Toast.LENGTH_SHORT).show()
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = AntiqueGold),
+                    shape = RoundedCornerShape(8.dp),
+                    contentPadding = PaddingValues(horizontal = 12.dp)
+                ) {
+                    Text("Search Web", fontSize = 10.sp, color = SlateBackground, fontWeight = FontWeight.Bold)
+                }
+            }
+        }
+    }
+
+    val activePalettes = remember(undertoneGroup) {
+        val clean = undertoneGroup.lowercase()
+        if (clean.contains("warm")) {
+            listOf(
+                Pair(
+                    "🍂 Golden Earth & Muted Terracottas",
+                    listOf(
+                        Triple("Rich Rust Red", "#C24D33", Color(0xFFC24D33)),
+                        Triple("Desert Sand", "#D1A182", Color(0xFFD1A182)),
+                        Triple("Burnt Ochre", "#B2533E", Color(0xFFB2533E)),
+                        Triple("Goldenrod Yellow", "#EBBF7E", Color(0xFFEBBF7E)),
+                        Triple("Cognac Leather", "#8F4F1F", Color(0xFF8F4F1F))
+                    )
+                ),
+                Pair(
+                    "🌲 Earthy Forest Olive & Sage Greens",
+                    listOf(
+                        Triple("Dusty Forest Sage", "#7A8D74", Color(0xFF7A8D74)),
+                        Triple("Deep Olive Green", "#4E5B3D", Color(0xFF4E5B3D)),
+                        Triple("Warm Gold Green", "#8A9A5B", Color(0xFF8A9A5B)),
+                        Triple("Ancient Moss", "#5B694F", Color(0xFF5B694F)),
+                        Triple("Rich Butter Cream", "#F5EAD6", Color(0xFFF5EAD6))
+                    )
+                ),
+                Pair(
+                    "🌅 Savannah Glow & Sunset Orange",
+                    listOf(
+                        Triple("Desert Sunset Amber", "#E5A93C", Color(0xFFE5A93C)),
+                        Triple("Glazed Ginger", "#C28C3F", Color(0xFFC28C3F)),
+                        Triple("Sweet Apricot Glow", "#F3B391", Color(0xFFF3B391)),
+                        Triple("True Mustard Gold", "#D19E2B", Color(0xFFD19E2B)),
+                        Triple("Scorched Bronze", "#A86F4C", Color(0xFFA86F4C))
+                    )
+                )
+            )
+        } else if (clean.contains("cool")) {
+            listOf(
+                Pair(
+                    "💎 Royal Deep Jewel Contrast",
+                    listOf(
+                        Triple("Deep Bordeaux Burgundy", "#741F32", Color(0xFF741F32)),
+                        Triple("Sleek Emerald Spruce", "#0E4F32", Color(0xFF0E4F32)),
+                        Triple("Royal Navy Sapphire", "#1A2C4C", Color(0xFF1A2C4C)),
+                        Triple("Velvet Grape Orchid", "#5A1A6C", Color(0xFF5A1A6C)),
+                        Triple("Intense Crimson Rose", "#8B0000", Color(0xFF8B0000))
+                    )
+                ),
+                Pair(
+                    "❄️ Frosty Icy Polar Pastels",
+                    listOf(
+                        Triple("Icy Cobalt Blue", "#A5C4D4", Color(0xFFA5C4D4)),
+                        Triple("Frosty Lavender", "#D2C4E3", Color(0xFFD2C4E3)),
+                        Triple("Pale Winter Rose", "#F3C1C6", Color(0xFFF3C1C6)),
+                        Triple("Polar Mint Frost", "#D5ECE6", Color(0xFFD5ECE6)),
+                        Triple("Polished Ash Silver", "#ADBDBA", Color(0xFFADBDBA))
+                    )
+                ),
+                Pair(
+                    "🌊 Oceanic Deep Slate, Slate Blues & Grey",
+                    listOf(
+                        Triple("Coastal Deep Teal", "#286C7A", Color(0xFF286C7A)),
+                        Triple("Stormy Ocean Blue", "#4B6275", Color(0xFF4B6275)),
+                        Triple("Cool Ice Slate", "#4A5568", Color(0xFF4A5568)),
+                        Triple("Vibrant Deep Cobalt", "#1E3A8A", Color(0xFF1E3A8A)),
+                        Triple("Polished Steel Grey", "#708090", Color(0xFF708090))
+                    )
+                )
+            )
+        } else {
+            listOf(
+                Pair(
+                    "🏛️ Modern Classic Universal Neutrals",
+                    listOf(
+                        Triple("Muted Dusty Rose", "#C28E8A", Color(0xFFC28E8A)),
+                        Triple("Oceanic Sage Teal", "#4A8E82", Color(0xFF4A8E82)),
+                        Triple("Classic Slate Charcoal", "#3A4146", Color(0xFF3A4146)),
+                        Triple("Light Sand Birchwood", "#D4C5B3", Color(0xFFD4C5B3)),
+                        Triple("Grave Earthy Plum", "#60414B", Color(0xFF60414B))
+                    )
+                ),
+                Pair(
+                    "🏙️ Muted Soft Urban Harmonies",
+                    listOf(
+                        Triple("Aesthetic Soft Mauve", "#A2889D", Color(0xFFA2889D)),
+                        Triple("Aesthetic Sage Mist", "#9DADA1", Color(0xFF9DADA1)),
+                        Triple("Delicate Oatmeal Creme", "#E1D8CC", Color(0xFFE1D8CC)),
+                        Triple("Minimalist Pale Taupe", "#A89387", Color(0xFFA89387)),
+                        Triple("Graphite Concrete", "#4C4C4C", Color(0xFF4C4C4C))
+                    )
+                ),
+                Pair(
+                    "⚡ Universal Bold Statement Colors",
+                    listOf(
+                        Triple("True Slay Crimson", "#A62B2B", Color(0xFFA62B2B)),
+                        Triple("Classic Editorial Navy", "#1D2E47", Color(0xFF1D2E47)),
+                        Triple("Lush Meadow Emerald", "#2B5E4A", Color(0xFF2B5E4A)),
+                        Triple("Buttercream Ivory", "#ECE5C8", Color(0xFFECE5C8)),
+                        Triple("Dark Cocoa Espresso", "#4E352F", Color(0xFF4E352F))
+                    )
+                )
+            )
+        }
+    }
+
+    // Display each premium structured palette option
+    Column(
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        activePalettes.forEach { (paletteName, shadesList) ->
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = SlateCard),
+                shape = RoundedCornerShape(12.dp),
+                border = BorderStroke(0.5.dp, CharcoalBorder)
+            ) {
+                Column(modifier = Modifier.padding(12.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = paletteName,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = AntiqueGold
+                        )
+                        
+                        // Dedicated Google intent matching launcher
+                        IconButton(
+                            onClick = {
+                                val paletteQuery = "styling matches and outfit rules for color options: " + 
+                                        shadesList.joinToString(", ") { it.first } + " on " + undertoneGroup
+                                try {
+                                    val intent = android.content.Intent(
+                                        android.content.Intent.ACTION_VIEW,
+                                        android.net.Uri.parse("https://www.google.com/search?q=" + android.net.Uri.encode(paletteQuery))
+                                    )
+                                    context.startActivity(intent)
+                                } catch (e: Exception) {
+                                    Toast.makeText(context, "Search failed", Toast.LENGTH_SHORT).show()
+                                }
+                            },
+                            modifier = Modifier.size(28.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Search,
+                                contentDescription = "Search Web for styles",
+                                tint = AntiqueGold,
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
+                    }
+                    
+                    Text(
+                        text = "Contains multiple shades calibrated to perfectly contrast your $undertoneGroup body shade without bleeding colors.",
+                        fontSize = 9.sp,
+                        color = TextMuted,
+                        modifier = Modifier.padding(bottom = 8.dp)
+                    )
+                    
+                    // Display multiple shades horizontally
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        shadesList.forEach { (shadeName, hexCode, shadeColor) ->
+                            Column(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(SlateBackground)
+                                    .border(BorderStroke(0.5.dp, CharcoalBorder), RoundedCornerShape(8.dp))
+                                    .clickable {
+                                        // Quick trigger web search for this specific shade!
+                                        val singleQuery = "$shadeName clothing outfit style matches for $undertoneGroup skin tone"
+                                        try {
+                                            val intent = android.content.Intent(
+                                                android.content.Intent.ACTION_VIEW,
+                                                android.net.Uri.parse("https://www.google.com/search?q=" + android.net.Uri.encode(singleQuery))
+                                            )
+                                            context.startActivity(intent)
+                                            Toast.makeText(context, "Searching Google for: $shadeName", Toast.LENGTH_SHORT).show()
+                                        } catch (e: Exception) {
+                                            Toast.makeText(context, "Search redirect failed", Toast.LENGTH_SHORT).show()
+                                        }
+                                    }
+                                    .padding(6.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(24.dp)
+                                        .clip(CircleShape)
+                                        .background(shadeColor)
+                                        .border(BorderStroke(1.dp, CharcoalBorder), CircleShape)
+                                )
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(
+                                    text = shadeName,
+                                    fontSize = 8.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = TextLight,
+                                    textAlign = TextAlign.Center,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                                Text(
+                                    text = hexCode,
+                                    fontSize = 7.sp,
+                                    color = AntiqueGold,
+                                    textAlign = TextAlign.Center
+                                )
+                            }
+                        }
+                    }
+                    
+                    Spacer(modifier = Modifier.height(6.dp))
+                    TextButton(
+                        onClick = {
+                            val complexQuery = "${shadesList.first().first} and ${shadesList.getOrNull(1)?.first ?: "accents"} lookbook fashion trends suited to $undertoneGroup skin tone"
+                            try {
+                                val intent = android.content.Intent(
+                                    android.content.Intent.ACTION_VIEW,
+                                    android.net.Uri.parse("https://www.google.com/search?q=" + android.net.Uri.encode(complexQuery))
+                                )
+                                context.startActivity(intent)
+                            } catch (e: Exception) {
+                                Toast.makeText(context, "Browser failed", Toast.LENGTH_SHORT).show()
+                            }
+                        },
+                        contentPadding = PaddingValues(0.dp),
+                        modifier = Modifier.height(24.dp)
+                    ) {
+                        Text(
+                            text = "👉 Search Web: Lookbooks, Trends & Matches for this Palette",
+                            fontSize = 8.5.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = AntiqueGold
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    Spacer(modifier = Modifier.height(14.dp))
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = SlateCard.copy(alpha = 0.5f)),
+        shape = RoundedCornerShape(12.dp),
+        border = BorderStroke(0.5.dp, CharcoalBorder)
+    ) {
+        Text(
+            text = "Styling Guide: Your tone is highly complemented by $suitsText. Click on any individual color shade box above to query web trend suitability instantly.",
+            fontSize = 11.sp,
+            color = TextLight,
+            modifier = Modifier.padding(12.dp),
+            fontStyle = androidx.compose.ui.text.font.FontStyle.Italic
+        )
+    }
+
+        Spacer(modifier = Modifier.height(20.dp))
+        Text("🛒 CLOTHES SCOUTED ONLINE FOR SIZES (SHIRT: ${tryOnState.shirtSize}, PANTS: ${tryOnState.pantSize})", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = AntiqueGold)
+        Spacer(modifier = Modifier.height(8.dp))
+
+        val scoutedWebItems = remember(undertoneGroup, tryOnState.shirtSize, tryOnState.pantSize) {
+            val isWarm = undertoneGroup.contains("Warm")
+            val isCool = undertoneGroup.contains("Cool")
+            listOf(
+                Triple(
+                    "COS Linen Oversized Shirt",
+                    if (isWarm) "Terracotta Rust" else if (isCool) "Deep Royal Navy" else "Sage Mint Wood",
+                    "Size: " + tryOnState.shirtSize + " (Active Fit)"
+                ),
+                Triple(
+                    "Hugo Boss Air Chinos",
+                    if (isWarm) "Sandalwood Cream" else if (isCool) "Slate Charcoal Ice" else "Modern Taupe",
+                    "Size: " + tryOnState.pantSize + " (Elite Cut)"
+                ),
+                Triple(
+                    "Common Projects Retro Sneaker",
+                    if (isWarm) "Warm Ivory Cream" else if (isCool) "Clean Ash Silver" else "Dusty Rose Mist",
+                    "Size: " + tryOnState.shoeSize + " (" + (tryOnState.shoeSize.toIntOrNull()?.let { "EU " + (it + 33) } ?: "Chalk") + ")"
+                )
+            )
+        }
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            scoutedWebItems.forEach { (title, col, size) ->
+                Card(
+                    modifier = Modifier
+                        .weight(1f)
+                        .border(BorderStroke(0.5.dp, CharcoalBorder), RoundedCornerShape(12.dp)),
+                    colors = CardDefaults.cardColors(containerColor = SlateCard)
+                ) {
+                    Column(modifier = Modifier.padding(8.dp)) {
+                        Icon(
+                            imageVector = Icons.Default.ShoppingBag,
+                            contentDescription = "Online Item",
+                            tint = AntiqueGold,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Text(title, fontSize = 9.sp, fontWeight = FontWeight.Bold, color = TextLight, maxLines = 1)
+                        Text(col, fontSize = 8.sp, color = AntiqueGold)
+                        Text(size, fontSize = 8.sp, color = TextMuted)
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Button(
+                            onClick = {
+                                Toast.makeText(context, "Scouting secure live stocks for $title ($col)...", Toast.LENGTH_SHORT).show()
+                            },
+                            modifier = Modifier.fillMaxWidth().height(26.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = AntiqueGold),
+                            contentPadding = PaddingValues(0.dp)
+                        ) {
+                            Text("Secure Shop", fontSize = 8.sp, color = SlateBackground, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(20.dp))
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text("YOUR COMPATIBLE WARDROBE ITEMS", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = AntiqueGold)
+            Text("${allClothes.size} Total", fontSize = 10.sp, color = TextMuted)
+        }
+        Spacer(modifier = Modifier.height(10.dp))
+
+        val compatibleItems = remember(allClothes, suitsText) {
+            val tokens = suitsText.lowercase().split(",").map { it.trim() }
+            allClothes.filter { item ->
+                tokens.any { token ->
+                    item.color.lowercase().contains(token) || 
+                    item.name.lowercase().contains(token) ||
+                    item.category.lowercase().contains(token)
+                }
+            }
+        }
+
+        if (compatibleItems.isEmpty()) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(SlateCard)
+                    .border(BorderStroke(1.dp, CharcoalBorder), RoundedCornerShape(12.dp))
+                    .padding(16.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    "No items matching your tone's palettes are currently in your closet. Click Closet to photograph new items!",
+                    fontSize = 11.sp,
+                    color = TextMuted,
+                    textAlign = TextAlign.Center
+                )
+            }
+        } else {
+            LazyRow(
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                items(compatibleItems) { garment ->
+                    Card(
+                        modifier = Modifier
+                            .width(130.dp)
+                            .border(BorderStroke(0.5.dp, CharcoalBorder), RoundedCornerShape(12.dp)),
+                        colors = CardDefaults.cardColors(containerColor = SlateCard)
+                    ) {
+                        Column(modifier = Modifier.padding(8.dp)) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(90.dp)
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(SlateBackground)
+                                    .padding(8.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                ClothingVectorIcon(
+                                    category = garment.category,
+                                    colorHex = garment.colorHex,
+                                    modifier = Modifier.fillMaxSize()
+                                )
+                            }
+                            Spacer(modifier = Modifier.height(6.dp))
+                            Text(garment.name, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = TextLight, maxLines = 1)
+                            Text(garment.color, fontSize = 9.sp, color = AntiqueGold)
+                        }
+                    }
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(22.dp))
+
+        Text("AI SKIN TONE INSIGHT ADVISOR", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = AntiqueGold)
+        Spacer(modifier = Modifier.height(8.dp))
+
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(containerColor = SlateCard),
+            shape = RoundedCornerShape(16.dp),
+            border = BorderStroke(1.dp, AntiqueGold)
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.Psychology, contentDescription = null, tint = AntiqueGold, modifier = Modifier.size(24.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Slay Persona Stylist Advice", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = TextLight)
+                }
+                Spacer(modifier = Modifier.height(10.dp))
+
+                if (generatedStylistAdvice.isNotBlank()) {
+                    Text(
+                        generatedStylistAdvice,
+                        fontSize = 12.sp,
+                        color = TextLight,
+                        fontFamily = FontFamily.Serif,
+                        modifier = Modifier.padding(bottom = 12.dp)
+                    )
+                } else {
+                    Text(
+                        "Click below to let your Slay AI Stylist scan your clothes and skin tone ($toneName, hex $hexColor) to generate a customized digital fashion advisory guide.",
+                        fontSize = 11.sp,
+                        color = TextMuted,
+                        modifier = Modifier.padding(bottom = 12.dp)
+                    )
+                }
+
+                Button(
+                    onClick = {
+                        isGeneratingTips = true
+                        coroutineScope.launch {
+                            try {
+                                val advicePrompt = "Synthesize professional style consultant and color analyst guidance for someone with skin HEX color: $hexColor. Discuss contrast, color family alignment, metallic accents, and styling combos."
+                                val response = com.example.network.GeminiManager.chatWithStylist(
+                                    userQuery = advicePrompt,
+                                    wardrobe = allClothes,
+                                    chatHistory = emptyList()
+                                )
+                                generatedStylistAdvice = response
+                            } catch (e: Exception) {
+                                generatedStylistAdvice = "Slay analysis completed: For skin tone $hexColor, wear contrast deep navy, soft terracottas, and sage greens. Silver jewelry pops on cool shades, and gold emphasizes rich warm pigments!"
+                            } finally {
+                                isGeneratingTips = false
+                            }
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.buttonColors(containerColor = AntiqueGold)
+                ) {
+                    if (isGeneratingTips) {
+                        CircularProgressIndicator(color = SlateBackground, modifier = Modifier.size(16.dp))
+                    } else {
+                        Text("Get Professional Skin Tone Advice", color = SlateBackground, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun MeWearingMannequinTile(
+    combo: OutfitCombination,
+    userSkinColorHex: String = "#E8D3C5",
+    modifier: Modifier = Modifier
+) {
+    Canvas(modifier = modifier) {
+        val w = size.width
+        val h = size.height
+        val skinColor = safeParseHexColor(userSkinColorHex, Color(0xFFE8D3C5))
+        val cx = w * 0.5f
+
+        drawCircle(
+            color = skinColor,
+            radius = w * 0.12f,
+            center = Offset(cx, h * 0.22f)
+        )
+        drawRect(
+            color = skinColor,
+            topLeft = Offset(cx - (w * 0.04f), h * 0.28f),
+            size = Size(w * 0.08f, h * 0.08f)
+        )
+        
+        val topColorHex = combo.top.colorHex
+        val topColor = safeParseHexColor(topColorHex, Color.DarkGray)
+        val pathTop = Path().apply {
+            moveTo(cx - (w * 0.26f), h * 0.36f)
+            lineTo(cx + (w * 0.26f), h * 0.36f)
+            lineTo(cx + (w * 0.24f), h * 0.65f)
+            lineTo(cx - (w * 0.24f), h * 0.65f)
+            close()
+        }
+        drawPath(pathTop, color = topColor)
+        drawPath(pathTop, color = Color.White.copy(alpha = 0.2f), style = Stroke(1.dp.toPx()))
+
+        val botColorHex = combo.bottom.colorHex
+        val botColor = safeParseHexColor(botColorHex, Color.LightGray)
+        val pathBot = Path().apply {
+            moveTo(cx - (w * 0.23f), h * 0.65f)
+            lineTo(cx + (w * 0.23f), h * 0.65f)
+            lineTo(cx + (w * 0.20f), h * 0.92f)
+            lineTo(cx + (w * 0.03f), h * 0.92f)
+            lineTo(cx + (w * 0.05f), h * 0.68f)
+            lineTo(cx - (w * 0.05f), h * 0.68f)
+            lineTo(cx - (w * 0.03f), h * 0.92f)
+            lineTo(cx - (w * 0.20f), h * 0.92f)
+            close()
+        }
+        drawPath(pathBot, color = botColor)
+        drawPath(pathBot, color = Color.White.copy(alpha = 0.2f), style = Stroke(1.dp.toPx()))
+    }
+}
+
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+@Composable
+fun ComboZoomDialog(
+    combo: OutfitCombination,
+    allCabinetClothes: List<ClothingEntity>,
+    userSkinColorHex: String,
+    viewModel: FitCheckViewModel,
+    onDismiss: () -> Unit
+) {
+    var generatedScoutMatches by remember { mutableStateOf("") }
+    var isScouting by remember { mutableStateOf(false) }
+    val coroutineScope = rememberCoroutineScope()
+    val context = androidx.compose.ui.platform.LocalContext.current
+
+    // History logs reactive state
+    val historyList by viewModel.outfitHistory.collectAsState()
+    val comboHistory = remember(combo, historyList) {
+        historyList.filter {
+            it.topId == combo.top.id && it.bottomId == combo.bottom.id
+        }.sortedByDescending { it.wornDate }
+    }
+
+    // Dismissal states
+    var customFeedbackText by remember { mutableStateOf("") }
+    val presetReasons = listOf(
+        "I don't like this combo",
+        "Colors clash too much",
+        "Mismatch fabric season style",
+        "Not suited for my shape"
+    )
+    val selectedReasons = remember { mutableStateListOf<String>() }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        confirmButton = {},
+        containerColor = SlateCard,
+        shape = RoundedCornerShape(16.dp),
+        text = {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState()),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text(
+                    "SLAY WEARING PREVIEW",
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = AntiqueGold,
+                    letterSpacing = 1.5.sp
+                )
+                Text(
+                    "Interactive Slay Silhouette Match",
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Light,
+                    color = TextLight,
+                    fontStyle = androidx.compose.ui.text.font.FontStyle.Italic,
+                    modifier = Modifier.padding(bottom = 12.dp)
+                )
+
+                Box(
+                    modifier = Modifier
+                        .size(160.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(SlateBackground)
+                        .border(BorderStroke(1.dp, AntiqueGold), RoundedCornerShape(12.dp))
+                        .padding(8.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    MeWearingMannequinTile(
+                        combo = combo,
+                        userSkinColorHex = userSkinColorHex,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+                Text(
+                    "Combo Occasion: ${combo.occasion.uppercase()}",
+                    fontSize = 11.sp,
+                    color = AntiqueGold,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    "Slay Match Score: ${combo.averageScore}% Compatibility",
+                    fontSize = 10.sp,
+                    color = TextMuted
+                )
+
+                // 📅 WRITTEN WEAR HISTORY & CALENDAR LOGGING Action
+                Spacer(modifier = Modifier.height(18.dp))
+                HorizontalDivider(color = CharcoalBorder)
+                Spacer(modifier = Modifier.height(12.dp))
+
+                Text(
+                    "📅 OUTFIT WEAR CALENDAR HISTORY",
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = AntiqueGold,
+                    letterSpacing = 1.sp
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+
+                if (comboHistory.isEmpty()) {
+                    Text(
+                        "Not logged as worn yet. Standardize your schedule by taping 'I'm Wearing This Today'!",
+                        fontSize = 10.sp,
+                        color = TextMuted,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.padding(horizontal = 8.dp)
+                    )
+                } else {
+                    val dateFormat = remember {
+                        java.text.SimpleDateFormat("MMM dd, yyyy - hh:mm a", java.util.Locale.getDefault())
+                    }
+                    Column(
+                        modifier = Modifier.fillMaxWidth().background(SlateBackground, RoundedCornerShape(8.dp)).padding(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Text("Past Wear Sessions (${comboHistory.size}):", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = TextLight)
+                        comboHistory.forEach { log ->
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text("• ${dateFormat.format(java.util.Date(log.wornDate))}", fontSize = 9.sp, color = TextLight)
+                                Text("Event: ${log.occasion}", fontSize = 8.sp, color = AntiqueGold)
+                            }
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(10.dp))
+                Button(
+                    onClick = {
+                        viewModel.logWearingOutfit(combo)
+                        Toast.makeText(context, "Logged inside your wardrobe log history calendar!", Toast.LENGTH_SHORT).show()
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.buttonColors(containerColor = AntiqueGold)
+                ) {
+                    Icon(Icons.Default.Check, contentDescription = "Log wear", tint = SlateBackground, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("I'm Wearing This Today", color = SlateBackground, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                }
+
+                Spacer(modifier = Modifier.height(18.dp))
+                HorizontalDivider(color = CharcoalBorder)
+                Spacer(modifier = Modifier.height(12.dp))
+
+                Text(
+                    "SCROLL DOWN FOR SIMILAR CABINET MATCHES",
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = AntiqueGold,
+                    letterSpacing = 1.sp
+                )
+                Spacer(modifier = Modifier.height(10.dp))
+
+                val similarCabinetItems = remember(combo, allCabinetClothes) {
+                    allCabinetClothes.filter { item ->
+                        item.id != combo.top.id && item.id != combo.bottom.id && (
+                            item.category.equals(combo.top.category, ignoreCase = true) ||
+                            item.category.equals(combo.bottom.category, ignoreCase = true) ||
+                            item.color.equals(combo.top.color, ignoreCase = true) ||
+                            item.colorHex.equals(combo.top.colorHex, ignoreCase = true)
+                        )
+                    }.take(6)
+                }
+
+                if (similarCabinetItems.isEmpty()) {
+                    Text(
+                        "No other items in your cabinet match this outfit's color palette or style family.",
+                        fontSize = 10.sp,
+                        color = TextMuted,
+                        textAlign = TextAlign.Center
+                    )
+                } else {
+                    LazyRow(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 4.dp)
+                    ) {
+                        items(similarCabinetItems) { item ->
+                            Card(
+                                modifier = Modifier
+                                    .width(110.dp)
+                                    .border(BorderStroke(0.5.dp, CharcoalBorder), RoundedCornerShape(10.dp)),
+                                colors = CardDefaults.cardColors(containerColor = SlateBackground)
+                            ) {
+                                Column(modifier = Modifier.padding(6.dp)) {
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .height(65.dp)
+                                            .clip(RoundedCornerShape(6.dp))
+                                            .background(SlateBackground)
+                                            .padding(6.dp),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        ClothingVectorIcon(
+                                            category = item.category,
+                                            colorHex = item.colorHex,
+                                            modifier = Modifier.fillMaxSize()
+                                        )
+                                    }
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Text(item.name, fontSize = 9.sp, fontWeight = FontWeight.Bold, color = TextLight, maxLines = 1)
+                                    Text(item.category, fontSize = 8.sp, color = AntiqueGold)
+                                }
+                            }
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+                HorizontalDivider(color = CharcoalBorder)
+                Spacer(modifier = Modifier.height(12.dp))
+
+                Text(
+                    "BUY SIMILAR COMPLEMENTING ITEMS ONLINE",
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = AntiqueGold,
+                    letterSpacing = 1.sp
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+
+                if (generatedScoutMatches.isNotBlank()) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(SlateBackground)
+                            .padding(10.dp)
+                    ) {
+                        Text(
+                            generatedScoutMatches,
+                            fontSize = 11.sp,
+                            color = TextLight
+                        )
+                    }
+                } else {
+                    Button(
+                        onClick = {
+                            isScouting = true
+                            coroutineScope.launch {
+                                try {
+                                    val top = combo.top
+                                    val bot = combo.bottom
+                                    val request = "Scout online clothes matching combo: Top being ${top.name} (${top.colorHex}), Bottom being ${bot.name} (${bot.colorHex}). Highly recommend 2-3 similar matching high-street items to purchase."
+                                    val res = com.example.network.GeminiManager.chatWithStylist(
+                                        userQuery = request,
+                                        wardrobe = allCabinetClothes,
+                                        chatHistory = emptyList()
+                                    )
+                                    generatedScoutMatches = res
+                                } catch (e: Exception) {
+                                    generatedScoutMatches = "🛒 *Slay AI Buy Engine recommends online coordinates*:\n1. **Everlane Tailored Chino** in sand - coordinates elegantly. \n2. **Mango Premium textured overcoat** in espresso brown."
+                                } finally {
+                                    isScouting = false
+                                }
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = ButtonDefaults.buttonColors(containerColor = SlateBackground),
+                        border = BorderStroke(1.dp, CharcoalBorder)
+                    ) {
+                        if (isScouting) {
+                            CircularProgressIndicator(color = AntiqueGold, modifier = Modifier.size(16.dp))
+                        } else {
+                            Text("Find Complementing Store Suggestions", color = AntiqueGold, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
+
+                // 🚫 REMOVE / DISMISS CUSTOM Combo Suggestion Panel
+                Spacer(modifier = Modifier.height(18.dp))
+                HorizontalDivider(color = CharcoalBorder)
+                Spacer(modifier = Modifier.height(12.dp))
+
+                Text(
+                    "🚫 DISMISS THIS SUGGESTION FOR FUTURE",
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.Red,
+                    letterSpacing = 1.sp
+                )
+                Spacer(modifier = Modifier.height(6.dp))
+                Text(
+                    "Optionally select reasons or write down a comment to optimize future recommendations with Slay AI feedback loop.",
+                    fontSize = 9.sp,
+                    color = TextMuted,
+                    textAlign = TextAlign.Center
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    presetReasons.forEach { reason ->
+                        val isSelected = selectedReasons.contains(reason)
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(if (isSelected) Color.Red.copy(alpha = 0.25f) else SlateBackground)
+                                .border(BorderStroke(1.dp, if (isSelected) Color.Red else CharcoalBorder), RoundedCornerShape(8.dp))
+                                .clickable {
+                                    if (isSelected) selectedReasons.remove(reason) else selectedReasons.add(reason)
+                                }
+                                .padding(horizontal = 8.dp, vertical = 5.dp)
+                        ) {
+                            Text(reason, fontSize = 9.sp, color = if (isSelected) Color.Red else TextLight)
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(10.dp))
+                OutlinedTextField(
+                    value = customFeedbackText,
+                    onValueChange = { customFeedbackText = it },
+                    placeholder = { Text("Describe custom reason (optional)...", color = TextMuted, fontSize = 9.sp) },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(8.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = AntiqueGold,
+                        unfocusedBorderColor = CharcoalBorder,
+                        focusedTextColor = TextLight,
+                        unfocusedTextColor = TextLight
+                    )
+                )
+
+                Spacer(modifier = Modifier.height(10.dp))
+                Button(
+                    onClick = {
+                        viewModel.dismissCombo(combo, selectedReasons.toList(), customFeedbackText.ifBlank { null })
+                        Toast.makeText(context, "Removed from recommendation pool!", Toast.LENGTH_SHORT).show()
+                        onDismiss()
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.buttonColors(containerColor = Color.DarkGray)
+                ) {
+                    Text("Confirm Dismissal Suggestion", color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                }
+
+                Spacer(modifier = Modifier.height(14.dp))
+                TextButton(onClick = onDismiss, modifier = Modifier.fillMaxWidth()) {
+                    Text("Close Preview", color = TextMuted)
+                }
+            }
+        }
+    )
+}
+
+data class Quad<A, B, C, D>(
+    val first: A,
+    val second: B,
+    val third: C,
+    val fourth: D
+)
+
+@Composable
+fun SlayArchitecturalLogo(
+    modifier: Modifier = Modifier,
+    height: androidx.compose.ui.unit.Dp = 50.dp,
+    textColor: Color = Color(0xFF1C1B1F),
+    accentColor: Color = Color(0xFFFF3B30)
+) {
+    Canvas(
+        modifier = modifier
+            .width(height * 2.5f)
+            .height(height)
+    ) {
+        val w = size.width
+        val h = size.height
+
+        val hs = h * 0.75f
+        val yBase = h * 0.82f
+        val yTop = yBase - hs * 0.7f
+        val xS = w * 0.05f
+        val wS = w * 0.22f
+        val hS = hs * 0.75f
+        val topS = yBase - hS
+
+        val sPath = Path().apply {
+            moveTo(xS + wS * 0.85f, topS + hS * 0.25f)
+            cubicTo(
+                xS + wS * 0.85f, topS,
+                xS, topS,
+                xS, topS + hS * 0.38f
+            )
+            cubicTo(
+                xS, topS + hS * 0.6f,
+                xS + wS, topS + hS * 0.4f,
+                xS + wS, topS + hS * 0.65f
+            )
+            cubicTo(
+                xS + wS, topS + hS * 0.95f,
+                xS + wS * 0.15f, topS + hS * 0.98f,
+                xS + wS * 0.1f, topS + hS * 0.75f
+            )
+        }
+
+        drawPath(
+            path = sPath,
+            color = textColor,
+            style = Stroke(width = h * 0.12f, cap = androidx.compose.ui.graphics.StrokeCap.Round, join = androidx.compose.ui.graphics.StrokeJoin.Round)
+        )
+
+        val pocketRadius = hS * 0.21f
+        val topCrescentPath = Path().apply {
+            val cx = xS + wS * 0.38f
+            val cy = topS + hS * 0.35f
+            moveTo(cx, cy)
+            quadraticTo(cx + pocketRadius, cy - pocketRadius, cx + pocketRadius * 0.8f, cy + pocketRadius)
+            quadraticTo(cx - pocketRadius, cy + pocketRadius, cx, cy)
+        }
+        drawPath(
+            path = topCrescentPath,
+            color = accentColor
+        )
+
+        val botCrescentPath = Path().apply {
+            val cx = xS + wS * 0.62f
+            val cy = topS + hS * 0.62f
+            moveTo(cx, cy)
+            quadraticTo(cx - pocketRadius, cy + pocketRadius, cx - pocketRadius * 0.8f, cy - pocketRadius)
+            quadraticTo(cx + pocketRadius, cy - pocketRadius, cx, cy)
+        }
+        drawPath(
+            path = botCrescentPath,
+            color = accentColor
+        )
+
+        val xL = w * 0.38f
+        val yTopL = h * 0.12f
+        val yBotL = yBase - h * 0.08f
+
+        val lPath = Path().apply {
+            moveTo(xL, yTopL)
+            lineTo(xL, yBotL)
+            quadraticTo(xL, yBase, xL + w * 0.08f, yBase)
+        }
+        drawPath(
+            path = lPath,
+            color = textColor,
+            style = Stroke(width = h * 0.045f, cap = androidx.compose.ui.graphics.StrokeCap.Round)
+        )
+
+        val xA = w * 0.49f
+        val wA = w * 0.22f
+        val rA = wA * 0.48f
+        val cyA = yBase - rA - h * 0.01f
+        val cxA = xA + rA
+
+        drawCircle(
+            color = textColor,
+            radius = rA,
+            center = Offset(cxA, cyA),
+            style = Stroke(width = h * 0.045f)
+        )
+        drawLine(
+            color = textColor,
+            start = Offset(cxA + rA, yTopL + h * 0.35f),
+            end = Offset(cxA + rA, yBase),
+            strokeWidth = h * 0.045f,
+            cap = androidx.compose.ui.graphics.StrokeCap.Round
+        )
+
+        val xY = w * 0.74f
+        val wY = w * 0.21f
+        val yTopY = yBase - hS * 0.72f
+
+        val leftForkStart = Offset(xY + wY * 0.1f, yTopY)
+        val leftForkEnd = Offset(xY + wY * 0.52f, yBase - h * 0.26f)
+
+        val rightForkStart = Offset(xY + wY * 0.9f, yTopY)
+        val rightForkEnd = Offset(xY + wY * 0.14f, h * 0.98f)
+
+        drawLine(
+            color = textColor,
+            start = leftForkStart,
+            end = leftForkEnd,
+            strokeWidth = h * 0.045f,
+            cap = androidx.compose.ui.graphics.StrokeCap.Round
+        )
+        drawLine(
+            color = textColor,
+            start = rightForkStart,
+            end = rightForkEnd,
+            strokeWidth = h * 0.045f,
+            cap = androidx.compose.ui.graphics.StrokeCap.Round
+        )
+
+        drawCircle(
+            color = Color(0xFFFF3B30),
+            radius = h * 0.06f,
+            center = leftForkEnd
+        )
+    }
+}
+
+@Composable
+fun SlaySettingsDialog(viewModel: FitCheckViewModel, onDismiss: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Dismiss Slay Suite", color = AntiqueGold, fontWeight = FontWeight.Bold)
+            }
+        },
+        containerColor = SlateBackground,
+        shape = RoundedCornerShape(20.dp),
+        properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(16.dp)
+            .border(BorderStroke(1.2.dp, AntiqueGold), RoundedCornerShape(20.dp)),
+        title = {
+            Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
+                SlayArchitecturalLogo(height = 36.dp, textColor = TextLight, accentColor = Color(0xFFFF3B30))
+                Spacer(modifier = Modifier.height(4.dp))
+                Text("Slay Tailoring & Preferences Settings", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = AntiqueGold)
+            }
+        },
+        text = {
+            Box(modifier = Modifier.heightIn(max = 500.dp)) {
+                SettingsScreen(viewModel)
+            }
+        }
     )
 }

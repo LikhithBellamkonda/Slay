@@ -170,8 +170,9 @@ class ClothingRepository(private val clothDao: ClothDao) {
         season: String,
         history: List<OutfitHistoryEntity> = emptyList()
     ): List<OutfitCombination> {
-        // Find recently worn item IDs (last 3 logging sessions)
-        val recentSessions = history.take(3)
+        // Find recently worn item IDs within the last 1 week (7 days)
+        val oneWeekAgo = System.currentTimeMillis() - (7L * 24 * 60 * 60 * 1000L)
+        val recentSessions = history.filter { it.wornDate >= oneWeekAgo }
         val recentlyWornIds = mutableSetOf<Int>()
         for (session in recentSessions) {
             recentlyWornIds.add(session.topId)
@@ -181,9 +182,26 @@ class ClothingRepository(private val clothDao: ClothDao) {
             session.accessoryId?.let { recentlyWornIds.add(it) }
         }
 
-        val tops = clothes.filter { it.category == "shirt" || it.category == "t-shirt" || it.category == "hoodie" }.take(10)
-        val bottoms = clothes.filter { it.category == "pants" || it.category == "jeans" }.take(10)
-        val shoes = clothes.filter { it.category == "shoes" }.take(10)
+        // Get candidate lists, excluding or penalizing items worn in the last 7 days (especially shirts / tops)
+        val allTops = clothes.filter { it.category == "shirt" || it.category == "t-shirt" || it.category == "hoodie" }
+        var tops = allTops.filter { !recentlyWornIds.contains(it.id) }.take(10)
+        // Fallback if wardrobe is small and excluding recently worn items leaves 0 options
+        if (tops.isEmpty()) {
+            tops = allTops.take(10)
+        }
+
+        val allBottoms = clothes.filter { it.category == "pants" || it.category == "jeans" || it.category == "shorts" }
+        var bottoms = allBottoms.filter { !recentlyWornIds.contains(it.id) }.take(10)
+        if (bottoms.isEmpty()) {
+            bottoms = allBottoms.take(10)
+        }
+
+        val allShoes = clothes.filter { it.category == "shoes" }
+        var shoes = allShoes.filter { !recentlyWornIds.contains(it.id) }.take(10)
+        if (shoes.isEmpty()) {
+            shoes = allShoes.take(10)
+        }
+
         val accessories = clothes.filter { it.category == "accessories" }
         val jackets = clothes.filter { it.category == "jacket" }
 
